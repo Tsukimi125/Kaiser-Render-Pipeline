@@ -11,6 +11,7 @@
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 RWTexture2D<float4> AmbientOcclusionRT;
+
 // RWTexture2D<float3> normalTexture;
 float _Intensity;
 float _Radius;
@@ -19,13 +20,15 @@ float4 _BufferSize;
 
 int _DirectionCount;
 int _SampleCount;
-
+Texture2D _BlueNoiseTexture;
+SAMPLER(sampler_BlueNoiseTexture);
 Texture2D _CameraNormalsTexture;
 SAMPLER(sampler_CameraNormalsTexture);
 Texture2D _CameraDepthTexture;
 SAMPLER(sampler_CameraDepthTexture);
 
 SAMPLER(sampler_point_clamp);
+SAMPLER(sampler_point_repeat);
 
 float4x4 _CameraProjectionMatrix;
 float4x4 _CameraInverseProjectionMatrix;
@@ -156,9 +159,13 @@ void HBAO(uint3 id : SV_DispatchThreadID)
     float3 dpdv = MinDiff(positionVS, positionBottonVS, positionTopVS) * invAspectRatio;
 
     float ao = 0.0;
-    float rand1 = Hash(screenUV);
+    
+    float rand1 = SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_point_repeat, screenUV, 0).r;
     float rand2 = Hash(frac(float2(rand1, rand1)));
     float rand3 = Hash(frac(float2(rand1, rand2)));
+    // float rand1 = Hash(screenUV);
+    // float rand2 = Hash(frac(float2(rand1, rand1)));
+    // float rand3 = Hash(frac(float2(rand1, rand2)));
 
     float radiusPixel = 0.5f * _Radius * 0.3f * _BufferSize.x / linearDepth;
     int _MaxRadiusPixels = 256;
