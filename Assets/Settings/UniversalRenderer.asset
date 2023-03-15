@@ -16,12 +16,13 @@ MonoBehaviour:
   settings:
     passEvent: 550
     computeShader: {fileID: 7200000, guid: 13a79d6cf36d27141a47b7bd78c640ca, type: 3}
+    blueNoiseTexture: {fileID: 2800000, guid: c90ba70611859b047aa23cd6eba14bd3, type: 3}
     aoType: 1
     intensity: 1
-    aoRadius: 0.5
+    aoRadius: 5
     maxDistance: 20.5
-    directionCount: 8
-    sampleCount: 4
+    directionCount: 6
+    sampleCount: 6
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

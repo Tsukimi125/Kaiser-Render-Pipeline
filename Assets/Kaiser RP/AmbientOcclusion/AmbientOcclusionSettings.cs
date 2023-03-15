@@ -18,6 +18,8 @@ public class AmbientOcclusionSettings
         HBAO
     }
 
+    public Texture2D blueNoiseTexture;
+
     public AOType aoType = AOType.HBAO;
 
     [Range(0f, 5f)] public float intensity;

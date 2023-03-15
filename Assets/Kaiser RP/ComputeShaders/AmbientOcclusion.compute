@@ -36,7 +36,7 @@ float _AngleBias = 0.1f * PI;
 
 float Hash(float2 p)
 {
-    return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
+    return frac(sin(dot(p, float2(1.9, 7.2))) * 4.5);
 }
 
 float3 TransformScreenUVToViewSpcae(float2 uv, float linear01Depth)
@@ -50,6 +50,11 @@ float3 TransformScreenUVToViewSpcae(float2 uv, float linear01Depth)
     return cameraFarPlaneRay.xyz * linear01Depth;
 }
 
+float SampleLinear01Depth(float2 uv)
+{
+    return Linear01Depth(SAMPLE_DEPTH_TEXTURE_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 0), _ZBufferParams);
+}
+
 float3 SampleTangetFromView(float2 uv, float2 dir, float2 invBufferSize, float linear01Depth)
 {
     // float3 tangent = 
@@ -61,6 +66,13 @@ float3 SampleTangetFromView(float2 uv, float2 dir, float2 invBufferSize, float l
     tangent = normalize(tangent);
     
     return tangent;
+}
+
+float3 MinDiff(float3 p, float3 p1, float3 p2)
+{
+    float3 v1 = p1 - p;
+    float3 v2 = p - p2;
+    return (length(v1) < length(v2)) ? v1 : v2;
 }
 
 float FallOff(float dist)
@@ -99,6 +111,8 @@ void HBAO(uint3 id : SV_DispatchThreadID)
     float2 bufferSize = _BufferSize.xy;
     float2 invBufferSize = _BufferSize.zw;
     float2 screenUV = id.xy / bufferSize;
+    float invAspectRatio = bufferSize.y * invBufferSize.x;
+
 
     float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_point_clamp, screenUV, 0).r;
 
@@ -118,10 +132,33 @@ void HBAO(uint3 id : SV_DispatchThreadID)
 
     float3 positionVS = TransformScreenUVToViewSpcae(screenUV, linear01Depth);
 
+    float2 delta = invBufferSize * 1.2;
+
+    float3 positionLeftVS, positionRightVS, positionTopVS, positionBottonVS;
+
+    float2 offsetUV = screenUV + float2(-delta.x, 0.0);
+    linear01Depth = SampleLinear01Depth(offsetUV);
+    positionLeftVS = TransformScreenUVToViewSpcae(offsetUV, linear01Depth);
+
+    offsetUV = screenUV + float2(delta.x, 0.0);
+    linear01Depth = SampleLinear01Depth(offsetUV);
+    positionRightVS = TransformScreenUVToViewSpcae(offsetUV, linear01Depth);
+
+    offsetUV = screenUV + float2(0.0, delta.y);
+    linear01Depth = SampleLinear01Depth(offsetUV);
+    positionTopVS = TransformScreenUVToViewSpcae(offsetUV, linear01Depth);
+
+    offsetUV = screenUV + float2(0.0, -delta.y);
+    linear01Depth = SampleLinear01Depth(offsetUV);
+    positionBottonVS = TransformScreenUVToViewSpcae(offsetUV, linear01Depth);
+
+    float3 dpdu = MinDiff(positionVS, positionLeftVS, positionRightVS);
+    float3 dpdv = MinDiff(positionVS, positionBottonVS, positionTopVS) * invAspectRatio;
+
     float ao = 0.0;
     float rand1 = Hash(screenUV);
-    float rand2 = Hash(screenUV + rand1);
-    float rand3 = Hash(screenUV + rand2);
+    float rand2 = Hash(frac(float2(rand1, rand1)));
+    float rand3 = Hash(frac(float2(rand1, rand2)));
 
     float radiusPixel = 0.5f * _Radius * 0.3f * _BufferSize.x / linearDepth;
     int _MaxRadiusPixels = 256;
@@ -133,7 +170,6 @@ void HBAO(uint3 id : SV_DispatchThreadID)
         // TODO: prepare stage 2 : compute steps
         float numSteps = min(_SampleCount, radiusPixel);
 
-        
         float stepSizePix = radiusPixel / (numSteps + 1);
         float maxNumSteps = _MaxRadiusPixels / stepSizePix;
 
@@ -153,24 +189,27 @@ void HBAO(uint3 id : SV_DispatchThreadID)
         for (int d = 0; d < _DirectionCount; d++)
         {
             float angle = stepAngle * d;
-            // float2 d = float2(cos(angle), sin(angle));
-            float2 dir = RotateDirections(float2(cos(angle), sin(angle)), float2(rand2, rand3));
+            float2 d = float2(cos(angle), sin(angle));
+            float2 dir = RotateDirections(float2(cos(angle), sin(angle)), float2(0.1, 0.1));
             float2 deltaUV = dir * stepSizeUV;
 
-            
-            float2 uv = screenUV + SnapUVOffset(float2(rand1, rand2) * deltaUV, bufferSize, invBufferSize);
+            float2 uv = screenUV + SnapUVOffset(float2(rand2, rand3) * deltaUV, bufferSize, invBufferSize);
             deltaUV = SnapUVOffset(deltaUV, bufferSize, invBufferSize);
+            float3 T = dpdu * deltaUV.x + dpdv * deltaUV.y;
 
             // float3 tangentVS = SampleTangetFromView(screenUV, d, invBufferSize, linear01Depth);
             // normalVS = normalVS * 0.5 + 0.5;
-            float3 B = cross(normalVS, float3(dir, 0.0));
-            float3 tangentVS = normalize(cross(B, normalVS));
-            // float tanT = GetTan(T);
-            // float sinT = TanToSin(tanT);
+            // float3 B = cross(normalVS, float3(dir, 0.0));
+            // float3 tangentVS = normalize(cross(B, normalVS));
+            float tanT = GetTan(T) + 0.1f;
+            float sinT = TanToSin(tanT);
 
-            // AmbientOcclusionRT[id.xy] = float4(tangentVS, 1.0);
+            AmbientOcclusionRT[id.xy] = float4(normalize(dir), float2(rand1, rand3));
+            // AmbientOcclusionRT[id.xy] = float4(deltaUV * 100, 0, 1);
+            // AmbientOcclusionRT[id.xy] = float4(normalize(T), 1);
+            
             // AmbientOcclusionRT[id.xy] = float4(screenUV, 0.0, 1.0);
-            float sinT = TanToSin(tangentVS.z + 0.1f);
+            // float sinT = TanToSin(tangentVS.z + 0.1f);
             // AmbientOcclusionRT[id.xy] = sinT;
   
             
@@ -196,8 +235,8 @@ void HBAO(uint3 id : SV_DispatchThreadID)
                 // float sinT = b / c;
                 
                 // AmbientOcclusionRT[id.xy] = float4(T, 1.0);
-                // ao += (saturate(sinH) - saturate(sinT)) * FallOff(dist);
-                ao += (sinH - sinT) * FallOff(dist);
+                ao += (saturate(sinH) - saturate(sinT)) * FallOff(dist);
+                // ao += (sinT) * FallOff(dist);
                 // ao += (sinH) * FallOff(dist);
                 // AmbientOcclusionRT[id.xy] = tanH;
                 // AmbientOcclusionRT[id.xy] = _Intensity / 2.0f;
@@ -210,7 +249,7 @@ void HBAO(uint3 id : SV_DispatchThreadID)
         }
         
     }
-    AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
+    // AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
 }
 
     // [loop]
