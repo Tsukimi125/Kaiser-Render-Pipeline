@@ -9,6 +9,7 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
     private AmbientOcclusionSettings settings; //基本参数
 
     static int aoRTId = Shader.PropertyToID("AmbientOcclusionRT");
+    static int blueNoiseId = Shader.PropertyToID("_BlueNoiseTexture");
     public AmbientOcclusionRenderPass(AmbientOcclusionSettings settings)
     {
         this.settings = settings;
@@ -40,6 +41,7 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
             // cmd.SetComputeFloatParam(settings.computeShader, "_Intensity", settings.intensity);
 
 
+
             Matrix4x4 projectionMatrix = renderingData.cameraData.GetProjectionMatrix();
             cmd.SetComputeVectorParam(settings.computeShader, "_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
             cmd.SetComputeMatrixParam(settings.computeShader, "_CameraProjectionMatrix", projectionMatrix);
@@ -56,7 +58,9 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
 
             cmd.GetTemporaryRT(aoRTId, descriptor);
 
+            cmd.SetComputeTextureParam(settings.computeShader, hbaoKernel, "_BlueNoiseTexture", blueNoiseId);
             cmd.SetComputeTextureParam(settings.computeShader, hbaoKernel, "AmbientOcclusionRT", aoRTId);
+
             cmd.DispatchCompute(settings.computeShader, hbaoKernel, width / 8, height / 8, 1);
             cmd.SetGlobalTexture("_AmbientOcclusionRT", aoRTId);
 
