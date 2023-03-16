@@ -1,0 +1,220 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel HBAO
+
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
+
+// #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+// #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareNormalsTexture.hlsl"
+
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> AmbientOcclusionRT;
+Texture2D<float3> _BlueNoiseTexture;
+// RWTexture2D<float3> normalTexture;
+float _Intensity;
+float _Radius;
+float _NegInvRadius2;
+float4 _BufferSize;
+
+int _DirectionCount;
+int _SampleCount;
+
+Texture2D _CameraNormalsTexture;
+SAMPLER(sampler_CameraNormalsTexture);
+Texture2D _CameraDepthTexture;
+SAMPLER(sampler_CameraDepthTexture);
+
+SAMPLER(sampler_point_clamp);
+SAMPLER(sampler_point_repeat);
+SAMPLER(sampler_linear_clamp);
+SAMPLER(sampler_linear_repeat);
+
+float4x4 _CameraProjectionMatrix;
+float4x4 _CameraInverseProjectionMatrix;
+
+
+float _AngleBias = 0.1f * PI;
+// float _MaxRadiusPixels = 256.0;
+
+float Hash(float2 p)
+{
+    return frac(sin(dot(p, float2(1.9, 7.2))) * 4.5);
+}
+
+float3 TransformScreenUVToViewSpcae(float2 uv, float linear01Depth)
+{
+    //calculate camera to far plane ray in the screen
+    float4 cameraFarPlaneRay = float4(uv * 2.0 - 1.0, 1.0, 1.0);
+    cameraFarPlaneRay = mul(_CameraInverseProjectionMatrix, cameraFarPlaneRay);
+    cameraFarPlaneRay.xyz = cameraFarPlaneRay.xyz;
+    // cameraFarPlaneRay.xyz = cameraFarPlaneRay.xyz / cameraFarPlaneRay.w;
+    //linear depth 0-1
+    return cameraFarPlaneRay.xyz * linear01Depth;
+}
+
+float SampleLinear01Depth(float2 uv)
+{
+    return Linear01Depth(SAMPLE_DEPTH_TEXTURE_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 0), _ZBufferParams);
+}
+
+float3 SampleTangetFromView(float2 uv, float2 dir, float2 invBufferSize, float linear01Depth)
+{
+    // float3 tangent = 
+    //     TransformScreenUVToViewSpcae(uv + dir * invBufferSize, linear01Depth) -
+    //     TransformScreenUVToViewSpcae(uv - dir * invBufferSize, linear01Depth);
+    float3 tangent = 
+    TransformScreenUVToViewSpcae(uv + dir * invBufferSize, linear01Depth) -
+    TransformScreenUVToViewSpcae(uv - dir * invBufferSize, linear01Depth);
+    tangent = normalize(tangent);
+    
+    return tangent;
+}
+
+float3 MinDiff(float3 p, float3 p1, float3 p2)
+{
+    float3 v1 = p1 - p;
+    float3 v2 = p - p2;
+    return (length(v1) < length(v2)) ? v1 : v2;
+}
+
+float FallOff(float dist)
+{
+    return saturate(1 - (dist * dist / (_Radius * _Radius))); // if dist >= _Radius saturate(FallOff(dist))=0 ao=0
+}
+
+float GetTan(float3 v)
+{
+    return v.z * rsqrt(dot(v.xy, v.xy));
+}
+
+float TanToSin(float x)
+{
+    return x * rsqrt(x * x + 1.0);
+}
+
+float2 RotateDirections(float2 dir, float2 CosSin)
+{
+    return float2(
+        dir.x * CosSin.x - dir.y * CosSin.y,
+        dir.x * CosSin.y + dir.y * CosSin.x
+    );
+}
+
+float2 SnapUVOffset(float2 uv, float2 bufferSize, float2 invBufferSize)
+{
+    return round(uv * bufferSize) * invBufferSize;
+}
+
+[numthreads(8,8,1)]
+void HBAO(uint3 id : SV_DispatchThreadID)
+{   
+    // screen info
+    float2 bufferSize = _BufferSize.xy;
+    float2 invBufferSize = _BufferSize.zw;
+    float2 screenUV = id.xy / bufferSize;
+    float aspectRatio = bufferSize.x * invBufferSize.y;
+    float invAspectRatio = bufferSize.y * invBufferSize.x;
+
+    // Depth
+    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_point_clamp, screenUV, 0).r;
+    float linearDepth = LinearEyeDepth(depth, _ZBufferParams);
+    float linear01Depth = Linear01Depth(depth, _ZBufferParams);
+
+
+    float3 positionVS = TransformScreenUVToViewSpcae(screenUV, linear01Depth);
+
+    float2 delta = invBufferSize * 1.2;
+
+    float3 positionLeftVS, positionRightVS, positionTopVS, positionBottonVS;
+
+    float2 offsetUV = screenUV + float2(-delta.x, 0.0);
+    linear01Depth = SampleLinear01Depth(offsetUV);
+    positionLeftVS = TransformScreenUVToViewSpcae(offsetUV, linear01Depth);
+
+    offsetUV = screenUV + float2(delta.x, 0.0);
+    linear01Depth = SampleLinear01Depth(offsetUV);
+    positionRightVS = TransformScreenUVToViewSpcae(offsetUV, linear01Depth);
+
+    offsetUV = screenUV + float2(0.0, delta.y);
+    linear01Depth = SampleLinear01Depth(offsetUV);
+    positionTopVS = TransformScreenUVToViewSpcae(offsetUV, linear01Depth);
+
+    offsetUV = screenUV + float2(0.0, -delta.y);
+    linear01Depth = SampleLinear01Depth(offsetUV);
+    positionBottonVS = TransformScreenUVToViewSpcae(offsetUV, linear01Depth);
+
+    float3 dpdu = MinDiff(positionVS, positionLeftVS, positionRightVS);
+    float3 dpdv = MinDiff(positionVS, positionBottonVS, positionTopVS) * invAspectRatio;
+
+    // Random (Blue Noise)
+    float3 rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV, 0));
+    float3 rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV, 0));
+    // rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV + rand.xy, 0));
+
+    float radiusPixel = 0.5f * _Radius * 0.3f * _BufferSize.x / linearDepth;
+    int _MaxRadiusPixels = 256;
+    float stepSize = min(radiusPixel, _MaxRadiusPixels);
+
+    float ao = 0.0;
+    
+    if (radiusPixel > 1.0f)
+    {
+        // TODO: prepare stage 2 : compute steps
+        float numSteps = min(_SampleCount, radiusPixel);
+
+        float stepSizePix = radiusPixel / (numSteps + 1);
+        float maxNumSteps = _MaxRadiusPixels / stepSizePix;
+
+        if (maxNumSteps < numSteps)
+        {
+            numSteps = floor(maxNumSteps + rand.z);
+            numSteps = max(numSteps, 1);
+            stepSizePix = _MaxRadiusPixels / numSteps;
+        }
+        
+        float2 stepSizeUV = stepSizePix * _BufferSize.zw;
+        float stepAngle = 2 * PI / _DirectionCount;
+        
+        // TODO: sample stage
+        
+        [loop]
+        for (int d = 0; d < _DirectionCount; d++)
+        {
+            float angle = stepAngle * d;
+            float2 d = float2(cos(angle), sin(angle));
+            float2 dir = RotateDirections(float2(cos(angle), sin(angle)), rand.xy);
+            float2 deltaUV = dir * stepSizeUV;
+
+            float2 uv = screenUV + SnapUVOffset(rand.xy * deltaUV, bufferSize, invBufferSize);
+            deltaUV = SnapUVOffset(deltaUV, bufferSize, invBufferSize);
+            float3 T = dpdu * deltaUV.x + dpdv * deltaUV.y;
+            // T = normalize(T);
+            
+            float tanT = GetTan(T) + 0.1f;
+            float sinT = TanToSin(tanT);
+
+            [loop]
+            for (int s = 1; s <= _SampleCount; s++)
+            {
+                uv += deltaUV;
+                float sampleDepth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 0).r;
+                float sample01Depth = Linear01Depth(sampleDepth, _ZBufferParams);
+                float3 samplePositionVS = TransformScreenUVToViewSpcae(uv, sample01Depth);
+                float3 H = samplePositionVS - positionVS;
+                float dist = length(H);
+                H = normalize(H);
+                float tanH = H.z;
+                float sinH = TanToSin(tanH);
+                
+                // ao += (saturate(sinH) - saturate(sinT)) * FallOff(dist);
+                ao += (sinH - sinT) * FallOff(dist);
+            
+            }
+        }
+    }
+    // AmbientOcclusionRT[id.xy] = float4(rand, 1.0);
+    AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
+}
