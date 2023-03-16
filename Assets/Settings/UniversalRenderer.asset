@@ -19,10 +19,10 @@ MonoBehaviour:
     blueNoiseTexture: {fileID: 2800000, guid: c90ba70611859b047aa23cd6eba14bd3, type: 3}
     aoType: 1
     intensity: 1
-    aoRadius: 5
-    maxDistance: 20.5
-    directionCount: 6
-    sampleCount: 6
+    aoRadius: 1
+    maxDistance: 25
+    directionCount: 8
+    sampleCount: 8
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

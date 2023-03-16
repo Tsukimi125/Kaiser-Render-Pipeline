@@ -1,6 +1,7 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel HBAO
 
+
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 
@@ -11,7 +12,7 @@
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 RWTexture2D<float4> AmbientOcclusionRT;
-
+Texture2D<float3> _BlueNoiseTexture;
 // RWTexture2D<float3> normalTexture;
 float _Intensity;
 float _Radius;
@@ -20,8 +21,7 @@ float4 _BufferSize;
 
 int _DirectionCount;
 int _SampleCount;
-Texture2D _BlueNoiseTexture;
-SAMPLER(sampler_BlueNoiseTexture);
+
 Texture2D _CameraNormalsTexture;
 SAMPLER(sampler_CameraNormalsTexture);
 Texture2D _CameraDepthTexture;
@@ -29,6 +29,8 @@ SAMPLER(sampler_CameraDepthTexture);
 
 SAMPLER(sampler_point_clamp);
 SAMPLER(sampler_point_repeat);
+SAMPLER(sampler_linear_clamp);
+SAMPLER(sampler_linear_repeat);
 
 float4x4 _CameraProjectionMatrix;
 float4x4 _CameraInverseProjectionMatrix;
@@ -109,29 +111,18 @@ float2 SnapUVOffset(float2 uv, float2 bufferSize, float2 invBufferSize)
 [numthreads(8,8,1)]
 void HBAO(uint3 id : SV_DispatchThreadID)
 {   
-    // TODO: prepare stage 1
-
+    
+    // screen info
     float2 bufferSize = _BufferSize.xy;
     float2 invBufferSize = _BufferSize.zw;
     float2 screenUV = id.xy / bufferSize;
     float invAspectRatio = bufferSize.y * invBufferSize.x;
 
-
+    // Depth
     float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_point_clamp, screenUV, 0).r;
-
-    float3 normal = SAMPLE_TEXTURE2D_LOD(_CameraNormalsTexture, sampler_point_clamp, screenUV, 0).xyz;
-    float3 normalVS = normalize(TransformWorldToViewNormal(normal));
-
-    // normalVS = normalVS * 0.5 + 0.5;
-    // float3 B = cross(normalVS, float3(0.0, 0.0, 1.0));
-    // float3 T = normalize(cross(normalVS, B));
-    // float tanT = GetTan(T);
-    // float sinT = TanToSin(tanT);
-
-    // AmbientOcclusionRT[id.xy] = float4(normalVS, 1.0);
-
     float linearDepth = LinearEyeDepth(depth, _ZBufferParams);
     float linear01Depth = Linear01Depth(depth, _ZBufferParams);
+
 
     float3 positionVS = TransformScreenUVToViewSpcae(screenUV, linear01Depth);
 
@@ -158,19 +149,16 @@ void HBAO(uint3 id : SV_DispatchThreadID)
     float3 dpdu = MinDiff(positionVS, positionLeftVS, positionRightVS);
     float3 dpdv = MinDiff(positionVS, positionBottonVS, positionTopVS) * invAspectRatio;
 
-    float ao = 0.0;
-    
-    float rand1 = SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_point_repeat, screenUV, 0).r;
-    float rand2 = Hash(frac(float2(rand1, rand1)));
-    float rand3 = Hash(frac(float2(rand1, rand2)));
-    // float rand1 = Hash(screenUV);
-    // float rand2 = Hash(frac(float2(rand1, rand1)));
-    // float rand3 = Hash(frac(float2(rand1, rand2)));
+    // Random (Blue Noise)
+    float3 rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV, 0));
+    rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV + rand.xy, 0));
+
 
     float radiusPixel = 0.5f * _Radius * 0.3f * _BufferSize.x / linearDepth;
     int _MaxRadiusPixels = 256;
     float stepSize = min(radiusPixel, _MaxRadiusPixels);
 
+    float ao = 0.0;
     
     if (radiusPixel > 1.0f)
     {
@@ -182,7 +170,7 @@ void HBAO(uint3 id : SV_DispatchThreadID)
 
         if (maxNumSteps < numSteps)
         {
-            numSteps = floor(maxNumSteps + rand1);
+            numSteps = floor(maxNumSteps + rand.z);
             numSteps = max(numSteps, 1);
             stepSizePix = _MaxRadiusPixels / numSteps;
         }
@@ -197,28 +185,17 @@ void HBAO(uint3 id : SV_DispatchThreadID)
         {
             float angle = stepAngle * d;
             float2 d = float2(cos(angle), sin(angle));
-            float2 dir = RotateDirections(float2(cos(angle), sin(angle)), float2(0.1, 0.1));
+            float2 dir = RotateDirections(float2(cos(angle), sin(angle)), rand.xy);
             float2 deltaUV = dir * stepSizeUV;
 
-            float2 uv = screenUV + SnapUVOffset(float2(rand2, rand3) * deltaUV, bufferSize, invBufferSize);
+            float2 uv = screenUV + SnapUVOffset(rand.xy * deltaUV, bufferSize, invBufferSize);
             deltaUV = SnapUVOffset(deltaUV, bufferSize, invBufferSize);
             float3 T = dpdu * deltaUV.x + dpdv * deltaUV.y;
-
-            // float3 tangentVS = SampleTangetFromView(screenUV, d, invBufferSize, linear01Depth);
-            // normalVS = normalVS * 0.5 + 0.5;
-            // float3 B = cross(normalVS, float3(dir, 0.0));
-            // float3 tangentVS = normalize(cross(B, normalVS));
+            // T = normalize(T);
+            
             float tanT = GetTan(T) + 0.1f;
             float sinT = TanToSin(tanT);
 
-            AmbientOcclusionRT[id.xy] = float4(normalize(dir), float2(rand1, rand3));
-            // AmbientOcclusionRT[id.xy] = float4(deltaUV * 100, 0, 1);
-            // AmbientOcclusionRT[id.xy] = float4(normalize(T), 1);
-            
-            // AmbientOcclusionRT[id.xy] = float4(screenUV, 0.0, 1.0);
-            // float sinT = TanToSin(tangentVS.z + 0.1f);
-            // AmbientOcclusionRT[id.xy] = sinT;
-  
             
             [loop]
             for (int s = 1; s <= _SampleCount; s++)
@@ -233,67 +210,11 @@ void HBAO(uint3 id : SV_DispatchThreadID)
                 float tanH = H.z;
                 float sinH = TanToSin(tanH);
                 
-                // float HdotN = dot(H, normalVS);
-                // float3 T = normalize(H - normalVS * HdotN);
-                // float a, b, c;//triangle
-                // a = sqrt(T.x * T.x + T.y * T.y);
-                // b = abs(T.z);
-                // c = sqrt(b * b + a * a);
-                // float sinT = b / c;
-                
-                // AmbientOcclusionRT[id.xy] = float4(T, 1.0);
                 ao += (saturate(sinH) - saturate(sinT)) * FallOff(dist);
-                // ao += (sinT) * FallOff(dist);
-                // ao += (sinH) * FallOff(dist);
-                // AmbientOcclusionRT[id.xy] = tanH;
-                // AmbientOcclusionRT[id.xy] = _Intensity / 2.0f;
-                // if (dist < _Radius) //  && sinH > sinT
-                // {
-                //     ao += 1;
-                // }
-                
+                // ao += (sinH - sinT) * FallOff(dist);
+            
             }
         }
-        
     }
-    // AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
+    AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
 }
-
-    // [loop]
-    // for (int d = 0; d < _DirectionCount; d++)
-    // {
-    //     float stepAngle = 1; // TEMP
-    //     float angle = stepAngle * (float(d) + rand1);
-    //     float2 direction = float2(cos(angle), sin(angle));
-    //     float2 deltaUV = round(stepSize * direction) * _ScreenSize.zw;
-    //     float2 snappedUV = uv;
-    //     // float rayPixels = frac(rand2) * stepSize + 1.0;
-    //     // AmbientOcclusionRT[id.xy] = rayPixels / 10;
-    //     [loop]
-    //     for (int s = 1; s <= _SampleCount; s++)
-    //     {
-    //         snappedUV += deltaUV;
-    //         float sampleDepth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_point_clamp, snappedUV, 0).r;
-    //         float3 samplePositionVS = TransformScreenUVToViewSpcae(snappedUV, Linear01Depth(sampleDepth, _ZBufferParams));
-    //         // rayPixels += stepSize;
-
-            
-
-
-            
-    //         // AmbientOcclusionRT[id.xy] = sinH - sinT;
-    //         // float tempAO = ComputeAO(positionVS, normal, samplePositionVS);
-    //         // ao += tempAO;
-    //         // float tempAO = SimpleAO(positionVS, samplePositionVS, normal, _AngleBias);
-    //         // ao += tempAO;
-
-    //     }
-    // }
-    // // calculate the ao
-    // float res = 1 - ao / _DirectionCount * _SampleCount;
-    // res *= _Intensity;
-    //res /= _DirectionCount * _SampleCount;
-    
-    // AmbientOcclusionRT[id.xy] = res;//float4(uv, 0.0, 0.0);
-    // AmbientOcclusionRT[id.xy] = float4(id.x & id.y, (id.x & 15) / 15.0, (id.y & 15) / 15.0, 0.0);
-

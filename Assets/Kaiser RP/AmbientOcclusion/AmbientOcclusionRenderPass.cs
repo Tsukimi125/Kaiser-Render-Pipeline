@@ -58,7 +58,7 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
 
             cmd.GetTemporaryRT(aoRTId, descriptor);
 
-            cmd.SetComputeTextureParam(settings.computeShader, hbaoKernel, "_BlueNoiseTexture", blueNoiseId);
+            cmd.SetComputeTextureParam(settings.computeShader, hbaoKernel, "_BlueNoiseTexture", settings.blueNoiseTexture);
             cmd.SetComputeTextureParam(settings.computeShader, hbaoKernel, "AmbientOcclusionRT", aoRTId);
 
             cmd.DispatchCompute(settings.computeShader, hbaoKernel, width / 8, height / 8, 1);
