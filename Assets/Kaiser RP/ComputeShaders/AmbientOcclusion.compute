@@ -184,7 +184,6 @@ void HBAO(uint3 id : SV_DispatchThreadID)
         for (int d = 0; d < _DirectionCount; d++)
         {
             float angle = stepAngle * d;
-            float2 d = float2(cos(angle), sin(angle));
             float2 dir = RotateDirections(float2(cos(angle), sin(angle)), rand.xy);
             float2 deltaUV = dir * stepSizeUV;
 
@@ -195,7 +194,7 @@ void HBAO(uint3 id : SV_DispatchThreadID)
             
             float tanT = GetTan(T) + 0.1f;
             float sinT = TanToSin(tanT);
-
+            // AmbientOcclusionRT[id.xy] = float4(normalize(T), 1);
             
             [loop]
             for (int s = 1; s <= _SampleCount; s++)
@@ -205,14 +204,33 @@ void HBAO(uint3 id : SV_DispatchThreadID)
                 float sample01Depth = Linear01Depth(sampleDepth, _ZBufferParams);
                 float3 samplePositionVS = TransformScreenUVToViewSpcae(uv, sample01Depth);
                 float3 H = samplePositionVS - positionVS;
+                float tanH = GetTan(H);
                 float dist = length(H);
-                H = normalize(H);
-                float tanH = H.z;
-                float sinH = TanToSin(tanH);
-                
-                ao += (saturate(sinH) - saturate(sinT)) * FallOff(dist);
+
+                // float sinH = TanToSin(tanH);
+
+                if (dist < _Radius) {
+                    float sinH = TanToSin(tanH);
+                    ao += FallOff(dist) * (saturate(sinH) - saturate(sinT));
+                    // ao += (sinH - sinT) * FallOff(dist);
+                }
+
+                // if (dist < _Radius && tanH > tanT) {
+                //     float sinH = TanToSin(tanH);
+                //     // ao += FallOff(dist) * (saturate(sinH) - saturate(sinT));
+                //     ao += (sinH - sinT) * FallOff(dist);
+                //     tanT = tanH;
+                //     sinT = sinH;
+                // }
+
+                // ao += (saturate(sinH) - saturate(sinT)) * FallOff(dist);
                 // ao += (sinH - sinT) * FallOff(dist);
-            
+                // if (dist < aoRadius && tanH > tanT) {
+                //     float sinH = TanToSin(tanH);
+                //     ao += FallOff(dist) * (sinH - sinT);
+                //     tanT = tanH;
+                //     sinT = sinH;
+                // }
             }
         }
     }
