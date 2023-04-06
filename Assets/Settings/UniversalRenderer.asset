@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 383388d925bbc7645bdf98a5c98a8dae, type: 3}
   m_Name: AO
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     passEvent: 550
     computeShader: {fileID: 7200000, guid: 13a79d6cf36d27141a47b7bd78c640ca, type: 3}
@@ -23,6 +23,24 @@ MonoBehaviour:
     maxDistance: 25
     directionCount: 8
     sampleCount: 8
+--- !u!114 &-3915427986871945859
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6fc7468e3425a6d4bbca3ad5e81b82f1, type: 3}
+  m_Name: KaiserSSRT
+  m_EditorClassIdentifier: 
+  m_Active: 0
+  settings:
+    passEvent: 550
+    shader: {fileID: 0}
+    computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
+    blueNoiseTexture: {fileID: 2800000, guid: c90ba70611859b047aa23cd6eba14bd3, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -40,8 +58,8 @@ MonoBehaviour:
   m_RendererFeatures:
   - {fileID: -6782012916456606115}
   - {fileID: 6982849082673399995}
-  - {fileID: 3537674322783641722}
-  m_RendererFeatureMap: 5d367e642f73e1a1bb08e9743e10e8607a208a9c0d581831
+  - {fileID: -3915427986871945859}
+  m_RendererFeatureMap: 5d367e642f73e1a1bb08e9743e10e8607df5dfa2fd9aa9c9
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -78,23 +96,6 @@ MonoBehaviour:
   m_CopyDepthMode: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 1
---- !u!114 &3537674322783641722
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6fc7468e3425a6d4bbca3ad5e81b82f1, type: 3}
-  m_Name: KaiserSSRT
-  m_EditorClassIdentifier: 
-  m_Active: 1
-  settings:
-    passEvent: 550
-    shader: {fileID: 0}
-    computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
 --- !u!114 &6982849082673399995
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -49,9 +49,10 @@ public class SSRTRenderPass : ScriptableRenderPass
 
             cmd.GetTemporaryRT(ssrRTId, descriptor);
             cmd.SetComputeTextureParam(settings.computeShader, ssrKernel, "_SSR_RT", ssrRTId);
+            cmd.SetComputeTextureParam(settings.computeShader, ssrKernel, "_BlueNoiseTexture", settings.blueNoiseTexture);
             cmd.DispatchCompute(settings.computeShader, ssrKernel, width / 8, height / 8, 1);       
             cmd.ReleaseTemporaryRT(ssrRTId);
-            
+
         }
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);

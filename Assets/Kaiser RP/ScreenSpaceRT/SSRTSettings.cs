@@ -11,5 +11,6 @@ public class SSRTSettings
     public RenderPassEvent passEvent = RenderPassEvent.BeforeRenderingPostProcessing;
     public Shader shader; //所用Shader
     public ComputeShader computeShader; //所用ComputeShader
+    public Texture2D blueNoiseTexture; //蓝噪声纹理
 
 }

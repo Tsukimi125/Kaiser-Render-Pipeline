@@ -5,6 +5,7 @@
 #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Deferred.hlsl"
 
 RWTexture2D<float4> _SSR_RT;
+Texture2D<float3> _BlueNoiseTexture;
 
 TEXTURE2D_X(_CameraDepthTexture);
 TEXTURE2D_X_HALF(_GBuffer0);
