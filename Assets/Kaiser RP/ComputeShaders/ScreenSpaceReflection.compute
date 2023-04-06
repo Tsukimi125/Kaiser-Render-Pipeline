@@ -1,0 +1,23 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Deferred.hlsl"
+
+RWTexture2D<float4> Result;
+
+TEXTURE2D_X(_CameraDepthTexture);
+TEXTURE2D_X_HALF(_GBuffer0);
+TEXTURE2D_X_HALF(_GBuffer1);
+TEXTURE2D_X_HALF(_GBuffer2);
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+
+    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+}
