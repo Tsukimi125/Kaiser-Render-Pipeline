@@ -52,7 +52,7 @@ void SSR (uint3 id : SV_DispatchThreadID)
     float3 positionSS = float3(uv, linearDepth);
     float3 positionWS = GetWorldSpacePosition(positionSS);
     float3 positionVS = GetViewSpacePosition(positionSS);
-    float3 viewDirVS = normalize(positionWS - GetCameraPositionWS());
+    float3 viewDirWS = normalize(positionWS - GetCameraPositionWS());
 
     _SSR_RT[id.xy] = float4(positionWS, roughness);
 }
