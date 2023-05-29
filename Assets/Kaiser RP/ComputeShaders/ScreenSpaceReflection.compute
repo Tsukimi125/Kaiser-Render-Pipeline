@@ -1,11 +1,13 @@
 #pragma kernel SSR
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Deferred.hlsl"
 
 RWTexture2D<float4> _SSR_RT;
 Texture2D<float3> _BlueNoiseTexture;
+Texture2D<float3> _SSR_NoiseTex;
 
 TEXTURE2D_X(_CameraDepthTexture);
 TEXTURE2D_X_HALF(_GBuffer0);
@@ -15,17 +17,65 @@ SAMPLER(sampler_point_clamp);
 
 float4 _BufferSize;
 
-float3 GetWorldSpacePosition(half3 positionSS)
+int _SSR_RayCounts = 4;
+
+
+float3 GetWorldSpacePosition(float2 uv, float depth)
 {
-    float4 positionWS = mul(UNITY_MATRIX_I_VP, half4(positionSS, 1));
-    return positionWS.xyz / positionWS.w;
+    return ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
 }
 
-float3 GetViewSpacePosition(half3 positionSS)
+float3 GetViewSpacePosition(float2 uv, float depth)
 {
-    float4 positionVS = mul(UNITY_MATRIX_I_P, half4(positionSS, 1));
-    return positionVS.xyz / positionVS.w;
+    return ComputeViewSpacePosition(uv, depth, UNITY_MATRIX_I_P);
 }
+
+float GetMarchSize(float2 start, float2 end, float2 samplerPos)
+{
+    float2 dir = abs(end - start);
+    return length(float2(min(dir.x, samplerPos.x), min(dir.y, samplerPos.y)));
+}
+
+float3 HizTrace(int hizMaxLevel, int hizStartLevel, int hizStopLevel,
+                int steps, float thickness, 
+                float2 rayCastSize, float3 rayStart, float3 rayDir)
+{
+    // float sampleSize = GetMarchSize(rayStart.xy, rayStart.xy + rayDir.xy, rayCastSize);
+    // float3 samplePos = rayStart + rayDir * (sampleSize);
+    // int level = hizStartLevel;
+    // float mask = 0.0;
+
+    // [loop]
+    // for (int i = 0; i < steps; i++)
+    // {
+    //     float2 cellCount = rayCastSize * exp2(level + 1.0);
+    //     float newSamplerSize = GetMarchSize(samplePos.xy, samplePos.xy + rayDir.xy, cellCount);
+    //     float3 newSamplePos = samplePos + rayDir * newSamplerSize;
+    //     float sampleMinDepth = Texture2DSampleLevel(SceneDepth, SceneDepth_Sampler, newSamplePos.xy, level);
+
+    //     [flatten]
+    //     if (sampleMinDepth < newSamplePos.z)
+    //     {
+    //         level = min(HiZ_Max_Level, level + 1.0);
+    //         samplePos = newSamplePos;
+    //     }
+    //     else
+    //     {
+    //         level--;
+    //     }
+
+    //     [branch]
+    //     if (level < HiZ_Stop_Level)
+    //     {
+    //         float delta = (-LinearEyeDepth(sampleMinDepth)) - (-LinearEyeDepth(samplePos.z));
+    //         mask = delta <= thickness && i > 0.0;
+    //         return float4(samplePos, mask);
+    //     }
+    // }
+    // return float4(samplePos, mask);
+    return float3(0.0, 0.0, 0.0);
+}
+
 
 [numthreads(8,8,1)]
 void SSR (uint3 id : SV_DispatchThreadID)
@@ -35,9 +85,10 @@ void SSR (uint3 id : SV_DispatchThreadID)
     float2 invResolution = _BufferSize.zw;
 
     float2 uv = id.xy / resolution;
-    // half4 gbuffer0 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer0, sampler_point_clamp, uv, 0);
-    // half4 gbuffer1 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer1, sampler_point_clamp, uv, 0);
-    // half4 gbuffer2 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer2, sampler_point_clamp, uv, 0);
+    half4 gbuffer0 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer0, sampler_point_clamp, uv, 0);
+    half4 gbuffer1 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer1, sampler_point_clamp, uv, 0);
+    half4 gbuffer2 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer2, sampler_point_clamp, uv, 0);
+
 
     // depth data
     float depth = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 0).x; // raw depth value has UNITY_REVERSED_Z applied on most platforms.
@@ -50,10 +101,22 @@ void SSR (uint3 id : SV_DispatchThreadID)
 
     half3 normalVS = TransformWorldToView(normalWS);
 
-    float3 positionSS = float3(uv, linearDepth);
-    float3 positionWS = GetWorldSpacePosition(positionSS);
-    float3 positionVS = GetViewSpacePosition(positionSS);
+    float3 positionSS = float3(uv, depth);
+    float3 positionWS = GetWorldSpacePosition(uv, depth);
+    float3 positionVS = GetViewSpacePosition(uv, depth);
     float3 viewDirWS = normalize(positionWS - GetCameraPositionWS());
 
-    _SSR_RT[id.xy] = float4(positionWS, roughness);
+    // prepare
+    half Ray_HitMask = 0, Out_Fade = 0, Out_Mask = 0, Out_PDF = 0, Out_RayDepth = 0;
+    half2 outUV = 0;
+    half4 outColor = 0;
+
+    // ray marching
+    for (uint i = 0; i < (uint)_SSR_RayCounts; i++) {
+        float2 Random = float2((float)i / (float)_SSR_RayCounts, sin(i));
+        // float2 Hash = tex2Dlod(_SSR_NoiseTex, half4((uv + _SSR_Jitter.zw + Random) * _SSR_RayCastSize.xy / _SSR_NoiseSize.xy, 0, 0)).xy;
+    }
+
+
+    _SSR_RT[id.xy] = float4(positionWS, linearDepth);
 }

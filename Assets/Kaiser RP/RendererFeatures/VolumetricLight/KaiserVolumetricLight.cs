@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-public class VolumetricLight : ScriptableRendererFeature
+public class KaiserVolumetricLight : ScriptableRendererFeature
 {
     // Start is called before the first frame update
     public VolumetricLightRenderPass volumetricLightRenderPass;
@@ -12,7 +12,7 @@ public class VolumetricLight : ScriptableRendererFeature
     [System.Serializable]
     public class Settings
     {
-        public Shader shader = null;
+        public ComputeShader computeShader = null;
         public RenderPassEvent renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
         public enum VolumetricLightMode
         {
