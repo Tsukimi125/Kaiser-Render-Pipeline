@@ -5,9 +5,12 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Deferred.hlsl"
 
+#include "../ShaderLibrary/RandomFunctions.hlsl"
+
 RWTexture2D<float4> _SSR_RT;
 Texture2D<float3> _BlueNoiseTexture;
 Texture2D<float3> _SSR_NoiseTex;
+float4 _SSR_Jitter;
 
 TEXTURE2D_X(_CameraDepthTexture);
 TEXTURE2D_X_HALF(_GBuffer0);
@@ -84,7 +87,7 @@ void SSR (uint3 id : SV_DispatchThreadID)
     float2 resolution = _BufferSize.xy;
     float2 invResolution = _BufferSize.zw;
 
-    float2 uv = id.xy / resolution;
+    float2 uv = (id.xy + 0.5) * invResolution;
     half4 gbuffer0 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer0, sampler_point_clamp, uv, 0);
     half4 gbuffer1 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer1, sampler_point_clamp, uv, 0);
     half4 gbuffer2 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer2, sampler_point_clamp, uv, 0);
@@ -111,10 +114,12 @@ void SSR (uint3 id : SV_DispatchThreadID)
     half2 outUV = 0;
     half4 outColor = 0;
 
+    float2 random = Rand3DPCG16(uint3(id.xy, 0));
+
     // ray marching
     for (uint i = 0; i < (uint)_SSR_RayCounts; i++) {
         float2 Random = float2((float)i / (float)_SSR_RayCounts, sin(i));
-        // float2 Hash = tex2Dlod(_SSR_NoiseTex, half4((uv + _SSR_Jitter.zw + Random) * _SSR_RayCastSize.xy / _SSR_NoiseSize.xy, 0, 0)).xy;
+        float2 Hash = SAMPLE_TEXTURE2D_X_LOD(_SSR_NoiseTex, sampler_point_clamp, (uv + _SSR_Jitter.zw + Random) * _SSR_RayCastSize.xy / _SSR_NoiseSize.xy, 0).xy;
     }
 
 
