@@ -6,6 +6,7 @@
 #include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Deferred.hlsl"
 
 #include "../ShaderLibrary/RandomFunctions.hlsl"
+#include "../ShaderLibrary/SamplingFunctions.hlsl"
 
 RWTexture2D<float4> _SSR_RT;
 Texture2D<float3> _BlueNoiseTexture;
@@ -33,11 +34,21 @@ float3 GetViewSpacePosition(float2 uv, float depth)
     return ComputeViewSpacePosition(uv, depth, UNITY_MATRIX_I_P);
 }
 
+float3x3 GetTangentBasis(float3 TangentZ) {
+	float3 UpVector = abs(TangentZ.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+	float3 TangentX = normalize(cross( UpVector, TangentZ));
+	float3 TangentY = cross(TangentZ, TangentX);
+	return float3x3(TangentX, TangentY, TangentZ);
+}
+
+
 float GetMarchSize(float2 start, float2 end, float2 samplerPos)
 {
     float2 dir = abs(end - start);
     return length(float2(min(dir.x, samplerPos.x), min(dir.y, samplerPos.y)));
 }
+
+
 
 float3 HizTrace(int hizMaxLevel, int hizStartLevel, int hizStopLevel,
                 int steps, float thickness, 
@@ -97,11 +108,17 @@ void SSR (uint3 id : SV_DispatchThreadID)
     float depth = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 0).x; // raw depth value has UNITY_REVERSED_Z applied on most platforms.
     float eyeDepth = LinearEyeDepth(depth, _ZBufferParams);
     float linearDepth = Linear01Depth(depth, _ZBufferParams);
+
+    if (depth <= 1e-7) 
+    {
+        _SSR_RT[id.xy] = 0;
+        return;
+    }
     
     // gbuffer data
     half3 normalWS = SAMPLE_TEXTURE2D_X_LOD(_GBuffer2, sampler_point_clamp, uv, 0).xyz;
     half roughness = 1.0 - SAMPLE_TEXTURE2D_X_LOD(_GBuffer2, sampler_point_clamp, uv, 0).w;
-
+    roughness = clamp(roughness, 0.02, 1);
     half3 normalVS = TransformWorldToView(normalWS);
 
     float3 positionSS = float3(uv, depth);
@@ -114,14 +131,32 @@ void SSR (uint3 id : SV_DispatchThreadID)
     half2 outUV = 0;
     half4 outColor = 0;
 
-    float2 random = Rand3DPCG16(uint3(id.xy, 0));
+    uint2 random = Rand3DPCG16(uint3(id.xy, 0)).xy;
+    float2 hash = Hammersley16(0, (uint)_SSR_RayCounts, random);
 
     // ray marching
-    for (uint i = 0; i < (uint)_SSR_RayCounts; i++) {
-        float2 Random = float2((float)i / (float)_SSR_RayCounts, sin(i));
-        float2 Hash = SAMPLE_TEXTURE2D_X_LOD(_SSR_NoiseTex, sampler_point_clamp, (uv + _SSR_Jitter.zw + Random) * _SSR_RayCastSize.xy / _SSR_NoiseSize.xy, 0).xy;
+    // for (uint i = 0; i < (uint)_SSR_RayCounts; i++) {
+    //     float4 lightDirTS = ImportanceSampleGGX(hash, roughness);
+    // }
+
+    float3 H = 0.0;
+    if (roughness > 0.1) {
+        H = mul(ImportanceSampleGGX(hash, roughness).xyz, GetTangentBasis(normalVS));
     }
+    else {
+        H = normalVS;
+    }
+    float4 lightDirTS = ImportanceSampleGGX(hash, roughness);
+    float3 lightDirWS = mul(lightDirTS.xyz, GetTangentBasis(normalWS));
+    float3 lightDirVS = mul(UNITY_MATRIX_P, float4(lightDirWS, 1.0)).xyz;
+    lightDirVS = reflect(normalize(positionVS), lightDirVS);
 
+    float3 rayStartSS = positionSS;
+    float4 rayEndSS = mul(UNITY_MATRIX_P, float4(lightDirVS, 0.0)) + float4(rayStartSS, 1);
+    rayEndSS.xyz = rcp(max(rayEndSS.w, 1e-4)) * rayEndSS.xyz;
+    float3 rayDepthSS = 0.5 * (rayStartSS + mul(UNITY_MATRIX_P, float4(0, 0, 1, 0)).xyz);
+    float3 rayDirSS = normalize(rayEndSS.xyz - rayStartSS.xyz);
+    float3 rayStepSS = rayEndSS.xyz - rayStartSS;
 
-    _SSR_RT[id.xy] = float4(positionWS, linearDepth);
+    _SSR_RT[id.xy] = float4(lightDirVS, 1.0);
 }

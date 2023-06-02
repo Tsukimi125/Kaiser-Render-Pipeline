@@ -1,3 +1,6 @@
+#ifndef KAISER_RANDOM
+#define KAISER_RANDOM
+
 // 3D random number generator inspired by PCGs (permuted congruential generator)
 // Using a **simple** Feistel cipher in place of the usual xor shift permutation step
 // @param v = 3D integer coordinate
@@ -39,4 +42,4 @@ uint3 Rand3DPCG16(int3 p)
 	return v >> 16u;
 }
 
-
+#endif
