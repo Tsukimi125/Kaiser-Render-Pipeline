@@ -15,6 +15,8 @@ Texture2D<float3> _SSR_NoiseTex;
 float4 _SSR_Jitter;
 
 TEXTURE2D_X(_CameraDepthTexture);
+TEXTURE2D_X(_SSR_HierarchicalDepth_RT);
+TEXTURE2D_X(_SSR_SceneColor_RT);
 TEXTURE2D_X_HALF(_GBuffer0);
 TEXTURE2D_X_HALF(_GBuffer1);
 TEXTURE2D_X_HALF(_GBuffer2);
@@ -22,8 +24,16 @@ SAMPLER(sampler_point_clamp);
 
 float4 _BufferSize;
 
-int _SSR_RayCounts = 4;
+float4x4 _SSR_ProjectionMatrix;
 
+int _SSR_RayCounts = 4;
+float _SSR_Thickness;
+
+
+int _Hiz_MaxLevel;
+int _Hiz_StartLevel;
+int _Hiz_StopLevel;
+int _Hiz_RaySteps;
 
 
 [numthreads(8,8,1)]
@@ -56,7 +66,7 @@ void SSR (uint3 id : SV_DispatchThreadID)
     roughness = clamp(roughness, 0.02, 1);
     half3 normalVS = TransformWorldToView(normalWS);
 
-    float3 positionSS = float3(uv, depth);
+    float3 positionSS = float3(uv * 2 - 1, depth);
     float3 positionWS = GetWorldSpacePosition(uv, depth);
     float3 positionVS = GetViewSpacePosition(uv, depth);
     float3 viewDirWS = normalize(positionWS - GetCameraPositionWS());
@@ -69,30 +79,52 @@ void SSR (uint3 id : SV_DispatchThreadID)
     uint2 random = Rand3DPCG16(uint3(id.xy, 0)).xy;
     float2 hash = Hammersley16(0, (uint)_SSR_RayCounts, random);
 
-    // ray marching
-    // for (uint i = 0; i < (uint)_SSR_RayCounts; i++) {
-    //     float4 lightDirTS = ImportanceSampleGGX(hash, roughness);
-    // }
 
-    float3 H = 0.0;
+    float3 H = float3(0.0, 0.0, 0.0);
+
     if (roughness > 0.1) {
+        // diffuser ?
         H = mul(ImportanceSampleGGX(hash, roughness).xyz, GetTangentBasis(normalVS));
     }
     else {
+        // very glossy
         H = normalVS;
     }
     float4 lightDirTS = ImportanceSampleGGX(hash, roughness);
     float3 lightDirWS = mul(lightDirTS.xyz, GetTangentBasis(normalWS));
-    float3 lightDirVS = mul(UNITY_MATRIX_P, float4(lightDirWS, 1.0)).xyz;
-    lightDirVS = reflect(normalize(positionVS), lightDirVS);
+    // float3 lightDirVS = mul(UNITY_MATRIX_P, float4(lightDirWS, 1.0)).xyz;
+    // lightDirVS = reflect(normalize(positionVS), lightDirVS);
+    float3 reflectionDirVS = normalize(reflect(normalize(positionVS), H.xyz));
 
-    float3 rayStartSS = positionSS;
-    float4 rayEndSS = mul(UNITY_MATRIX_P, float4(lightDirVS, 0.0)) + float4(rayStartSS, 1);
-    rayEndSS.xyz = rcp(max(rayEndSS.w, 1e-4)) * rayEndSS.xyz;
-    float3 rayDepthSS = 0.5 * (rayStartSS + mul(UNITY_MATRIX_P, float4(0, 0, 1, 0)).xyz);
-    float3 rayDirSS = normalize(rayEndSS.xyz - rayStartSS.xyz);
-    float3 rayStepSS = rayEndSS.xyz - rayStartSS;
+    // float3 rayStartSS = positionSS;
+    // float4 rayEndSS = mul(UNITY_MATRIX_P, float4(lightDirVS, 0.0)) + float4(rayStartSS, 1);
+    // rayEndSS.xyz = rcp(max(rayEndSS.w, 1e-4)) * rayEndSS.xyz;
+    // float3 rayDepthSS = 0.5 * (rayStartSS + mul(UNITY_MATRIX_P, float4(0, 0, 1, 0)).xyz);
+    // float3 rayDirSS = normalize(rayEndSS.xyz - rayStartSS.xyz);
+    // float3 rayStepSS = rayEndSS.xyz - rayStartSS;
 
-    float hizDepth = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 3).x;
-    _SSR_RT[id.xy] = float4(hizDepth, 0.0, 0.0, 0.0);
+    float3 rayStartSS = float3(uv, depth);
+    float4 rayProjSS = mul(UNITY_MATRIX_P, float4(positionVS + reflectionDirVS, 1.0));
+    float3 rayDirSS = normalize(rayProjSS.xyz  - positionSS); //   * rcp(max(rayProjSS.w, 1e-4)) 
+    rayDirSS.xy *= 0.5;
+
+    // HizTrace_Base
+    // float hizDepth = _SSR_HierarchicalDepth_RT.SampleLevel(sampler_point_clamp, uv, 4).x;
+
+    float4 Hiz_Result = HizTrace_Base(
+        _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
+        _Hiz_RaySteps, _SSR_Thickness, _BufferSize.zw,
+        rayStartSS, rayDirSS,
+        _SSR_HierarchicalDepth_RT, sampler_point_clamp
+    );
+
+    float4 sceneColor = SAMPLE_TEXTURE2D_X_LOD(_SSR_SceneColor_RT, sampler_point_clamp, uv, 0);
+    float4 reflColor = SAMPLE_TEXTURE2D_X_LOD(_SSR_SceneColor_RT, sampler_point_clamp, Hiz_Result.xy, 0);
+
+    // _SSR_RT[id.xy] = float4(hizDepth, 0.0, 0.0, 0.0);
+    // _SSR_RT[id.xy] = float4(Hiz_Result.xyz, 1.0);
+    // _SSR_RT[id.xy] = float4(rayDirSS.xyz, 1.0);
+    _SSR_RT[id.xy] = float4(Hiz_Result);
+    // _SSR_RT[id.xy] = float4(reflColor);
+
 }
