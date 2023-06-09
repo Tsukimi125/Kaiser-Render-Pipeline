@@ -21,10 +21,10 @@ Varyings DefaultPassVertex(uint vertexID : SV_VertexID) {
 	output.screenUV = float2(vertexID <= 1 ? 0.0 : 2.0,
 		vertexID == 1 ? 2.0 : 0.0);
 	//some graphics APIs have the texture V coordinate start at the top while others have it start at the bottom
-	// if (_ProjectionParams.x < 0.0) {
-	// 	output.screenUV.y = 1.0 - output.screenUV.y;
-	// }
-	output.screenUV.y = 1.0 - output.screenUV.y;
+	if (_ProjectionParams.x < 0.0) {
+		output.screenUV.y = 1.0 - output.screenUV.y;
+	}
+	// output.screenUV.y = 1.0 - output.screenUV.y;
 	return output;
 }
 
@@ -36,7 +36,7 @@ float GetHierarchicalZBuffer(Varyings input) : SV_TARGET{
 		_SSR_HierarchicalDepth_RT.SampleLevel(sampler_point_clamp, uv, _SSR_HiZ_PrevDepthLevel, int2(-1.0, 1.0)).r,
 		_SSR_HierarchicalDepth_RT.SampleLevel(sampler_point_clamp, uv, _SSR_HiZ_PrevDepthLevel, int2(1.0, -1.0)).r,
 		_SSR_HierarchicalDepth_RT.SampleLevel(sampler_point_clamp, uv, _SSR_HiZ_PrevDepthLevel, int2(1.0, 1.0)).r
-		);
+	);
 	//sample pixel surrounds and pick minnset depth
 	return max(max(minDepth.r, minDepth.g), max(minDepth.b, minDepth.a));
 	// return 0.5;

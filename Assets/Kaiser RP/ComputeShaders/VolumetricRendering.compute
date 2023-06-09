@@ -21,7 +21,6 @@ float4 _BufferSize;
 
 int _VL_SampleCounts = 4;
 
-
 float3 GetWorldSpacePosition(float2 uv, float depth)
 {
     return ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
