@@ -20,7 +20,6 @@ void Hiz_Buffer_Generation(uint3 id : SV_DispatchThreadID)
 {
     float2 uv = (id.xy + 0.5) * _PrevCurr_Inverse_Size.xy;
     
-    
     /*FinalMinZ = max( FinalMinZ, _PrevMipDepth.SampleLevel(sampler_PrevMipDepth, uv + int2( 1,  0) * _PrevCurr_Inverse_Size.zw, 0) );
     FinalMinZ = max( FinalMinZ, _PrevMipDepth.SampleLevel(sampler_PrevMipDepth, uv + int2(-1,  0) * _PrevCurr_Inverse_Size.zw, 0) );
     FinalMinZ = max( FinalMinZ, _PrevMipDepth.SampleLevel(sampler_PrevMipDepth, uv + int2( 0,  1) * _PrevCurr_Inverse_Size.zw, 0) );

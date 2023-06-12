@@ -8,18 +8,19 @@ public class SSRTRenderPass : ScriptableRenderPass
 {
     private SSRTSettings settings; //基本参数
     private Material material; //材质
-    readonly int SSR_RT_ID = Shader.PropertyToID("_SSR_RT"),
-    SSR_SceneColor_ID = Shader.PropertyToID("_SSR_SceneColor_RT"),
-    SSR_HierarchicalDepth_ID = Shader.PropertyToID("_SSR_HierarchicalDepth_RT"),
-    SSR_HierarchicalDepth_BackUp_ID = Shader.PropertyToID("_SSR_HierarchicalDepth_BackUp_RT"),
-    SSR_ProjectionMatrix_ID = Shader.PropertyToID("_SSR_ProjectionMatrix");
 
-    RenderTexture SSR_HierarchicalDepth_RT, SSR_HierarchicalDepth_BackUp_RT;
-    Matrix4x4 SSR_ProjectionMatrix;
+    int pyramidDepth_ID = Shader.PropertyToID("_PyramidDepth");
 
-    enum Pass
+    private static class SSR_InputIDs 
     {
-        PrepareHiz,
+        public static int SceneColor = Shader.PropertyToID("_SSR_SceneColor_RT");
+
+    }
+
+    private static class SSR_OutputIDs
+    {
+        public static int UVWPdf = Shader.PropertyToID("_SSR_Out_UVWPdf");
+        public static int ColorMask = Shader.PropertyToID("_SSR_Out_ColorMask");
     }
 
     public SSRTRenderPass(SSRTSettings settings)
@@ -43,11 +44,8 @@ public class SSRTRenderPass : ScriptableRenderPass
 
         if (material == null && settings.shader != null)
         {
-            //通过此方法创建所需材质
             material = CoreUtils.CreateEngineMaterial(settings.shader);
         }
-
-
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -56,66 +54,57 @@ public class SSRTRenderPass : ScriptableRenderPass
 
         using (new ProfilingScope(cmd, profilingSampler))
         {
+            cmd.BeginSample("Ray Tracing");
             // Prepare
             int width = renderingData.cameraData.cameraTargetDescriptor.width;
             int height = renderingData.cameraData.cameraTargetDescriptor.height;
-            SSR_ProjectionMatrix = GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, false);
-            Debug.Log("SSR_ProjectionMatrix: " + SSR_ProjectionMatrix);
-            RenderTextureDescriptor descriptor = new RenderTextureDescriptor(
+ 
+            RenderTextureDescriptor descriptor0 = new RenderTextureDescriptor(
                 width, height, RenderTextureFormat.Default, 0, 0);
-            descriptor.sRGB = false;
-            descriptor.enableRandomWrite = true;
-
-            cmd.GetTemporaryRT(SSR_SceneColor_ID, descriptor);
-            cmd.Blit(Shader.GetGlobalTexture("_BlitTexture"), SSR_SceneColor_ID);
-
-            RenderTextureDescriptor Hiz_Descriptor = new RenderTextureDescriptor(
-                width, height, RenderTextureFormat.RFloat, 0, 0);
-            Hiz_Descriptor.sRGB = false;
-            Hiz_Descriptor.enableRandomWrite = true;
-            Hiz_Descriptor.useMipMap = true;
-            Hiz_Descriptor.autoGenerateMips = false;
-
-            // Hi-Z Buffer
-            cmd.GetTemporaryRT(SSR_HierarchicalDepth_ID, Hiz_Descriptor);
-            cmd.GetTemporaryRT(SSR_HierarchicalDepth_BackUp_ID, Hiz_Descriptor);
-
-            cmd.Blit(Shader.GetGlobalTexture("_CameraDepthTexture"), SSR_HierarchicalDepth_ID);
-
-            //set Hiz-depth RT
-            for (int i = 0; i < settings.Hiz_MaxLevel; i++)
-            {
-                cmd.SetGlobalInt("_SSR_HiZ_PrevDepthLevel", i);
-                cmd.SetRenderTarget(SSR_HierarchicalDepth_BackUp_ID, i + 1);
-                cmd.DrawProcedural(Matrix4x4.identity, material, (int)Pass.PrepareHiz, MeshTopology.Triangles, 3);
-                cmd.CopyTexture(SSR_HierarchicalDepth_BackUp_ID, 0, i + 1, SSR_HierarchicalDepth_ID, 0, i + 1);
-            }
-            // cmd.SetGlobalTexture(SSR_HierarchicalDepth_ID, SSR_HierarchicalDepth_RT);
+            descriptor0.sRGB = false;
+            descriptor0.enableRandomWrite = true;
+            RenderTextureDescriptor descriptor1 = new RenderTextureDescriptor(
+                width, height, RenderTextureFormat.Default, 0, 0);
+            descriptor1.sRGB = false;
+            descriptor1.enableRandomWrite = true;
+            RenderTextureDescriptor descriptor2 = new RenderTextureDescriptor(
+                width, height, RenderTextureFormat.Default, 0, 0);
+            descriptor2.sRGB = false;
+            descriptor2.enableRandomWrite = true;
 
             cmd.SetComputeVectorParam(settings.computeShader, "_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
 
-            int ssrKernel = settings.computeShader.FindKernel("SSR");
+            int k1 = settings.computeShader.FindKernel("SSR_RayTracing");
+            
+            // Init Input
+            cmd.GetTemporaryRT(SSR_InputIDs.SceneColor, descriptor0);
+            cmd.Blit(Shader.GetGlobalTexture("_BlitTexture"), SSR_InputIDs.SceneColor);
 
-            cmd.GetTemporaryRT(SSR_RT_ID, descriptor);
-            cmd.SetComputeTextureParam(settings.computeShader, ssrKernel, "_SSR_RT", SSR_RT_ID);
-            cmd.SetComputeTextureParam(settings.computeShader, ssrKernel, "_SSR_NoiseTex", settings.noiseTex);
-            cmd.SetComputeTextureParam(settings.computeShader, ssrKernel, "_SSR_HierarchicalDepth_RT", SSR_HierarchicalDepth_ID);
-            cmd.SetComputeTextureParam(settings.computeShader, ssrKernel, "_SSR_SceneColor_RT", SSR_SceneColor_ID);
+            cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_SceneColor_RT", SSR_InputIDs.SceneColor);
+            cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_PyramidDepth", pyramidDepth_ID);  
+
+            // Init Output
+            cmd.GetTemporaryRT(SSR_OutputIDs.UVWPdf, descriptor1);
+            cmd.GetTemporaryRT(SSR_OutputIDs.ColorMask, descriptor2);
+            cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_UVWPdf", SSR_OutputIDs.UVWPdf);
+            cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_ColorMask", SSR_OutputIDs.ColorMask);
+
+            
+
+            // Init Hiz Trace Settings
             cmd.SetComputeIntParam(settings.computeShader, "_Hiz_MaxLevel", settings.Hiz_MaxLevel);
             cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StartLevel", settings.Hiz_StartLevel);
             cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StopLevel", settings.Hiz_StopLevel);
             cmd.SetComputeIntParam(settings.computeShader, "_Hiz_RaySteps", settings.Hiz_RaySteps);
             cmd.SetComputeFloatParam(settings.computeShader, "_SSR_Thickness", settings.SSR_Thickness);
-            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjectionMatrix", SSR_ProjectionMatrix);
-            cmd.DispatchCompute(settings.computeShader, ssrKernel, width / 8, height / 8, 1);
 
-            // if (settings.debugMode != SSRTSettings.DebugMode.None)
-            // {
-            //     cmd.Blit(SSR_RT_ID, colorAttachmentHandle);
-            // }
+            cmd.DispatchCompute(settings.computeShader, k1, width / 8, height / 8, 1);
 
-            cmd.ReleaseTemporaryRT(SSR_RT_ID);
+ 
+            cmd.ReleaseTemporaryRT(SSR_OutputIDs.UVWPdf);
+            cmd.ReleaseTemporaryRT(SSR_OutputIDs.ColorMask);
 
+            cmd.EndSample("Ray Tracing");
         }
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);

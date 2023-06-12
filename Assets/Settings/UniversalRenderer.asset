@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a62d94edd4db7c94bab8e4717093e483, type: 3}
   m_Name: PyramidDepth
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   settings:
     computeShader: {fileID: 7200000, guid: 3923aa8f3198eea49acead9f17de170b, type: 3}
     mipCount: 10
-    debugEnabled: 0
+    debugEnabled: 1
     debugMip: 0
 --- !u!114 &-3915427986871945859
 MonoBehaviour:

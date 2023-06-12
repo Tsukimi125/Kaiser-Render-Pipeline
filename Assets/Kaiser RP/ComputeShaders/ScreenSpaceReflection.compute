@@ -1,4 +1,4 @@
-#pragma kernel SSR
+#pragma kernel SSR_RayTracing
 #pragma kernel SSR_URP_TEST
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -8,6 +8,7 @@
 
 #include "../ShaderLibrary/RandomFunctions.hlsl"
 #include "../ShaderLibrary/SamplingFunctions.hlsl"
+#include "../ShaderLibrary/KaiserSpaceTransformFunctions.hlsl"
 
 #include "../ShaderLibrary/ScreenSpaceRayTracing.hlsl"
 // #include "../ShaderLibrary/SSRT.hlsl"
@@ -15,13 +16,15 @@
 #define BRDF_BIAS 0.7f
 
 
-RWTexture2D<float4> _SSR_RT;
-Texture2D<float3> _BlueNoiseTexture;
-Texture2D<float3> _SSR_NoiseTex;
+RWTexture2D<float4> _SSR_Out_UVWPdf;
+RWTexture2D<float4> _SSR_Out_ColorMask;
+
 float4 _SSR_Jitter;
 
+Texture2D _SSR_PyramidDepth;
+
 TEXTURE2D_X(_CameraDepthTexture);
-TEXTURE2D_X(_SSR_HierarchicalDepth_RT);
+
 TEXTURE2D_X(_SSR_SceneColor_RT);
 TEXTURE2D_X_HALF(_GBuffer0);
 TEXTURE2D_X_HALF(_GBuffer1);
@@ -33,7 +36,7 @@ float4 _BufferSize;
 
 float4x4 _SSR_ProjectionMatrix;
 
-int _SSR_RayCounts = 4;
+
 float _SSR_Thickness;
 
 int _Hiz_MaxLevel;
@@ -42,73 +45,98 @@ int _Hiz_StopLevel;
 int _Hiz_RaySteps;
 
 [numthreads(8, 8, 1)]
-void SSR(uint3 id : SV_DispatchThreadID)
+void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
 {
-    // screen data
     float2 resolution = _BufferSize.xy;
     float2 invResolution = _BufferSize.zw;
-    float2 uv = (id.xy + 0.1f) * invResolution;
+    float2 uv = (id.xy + 0.5f) * invResolution;
+
+    // TODO: USE THIS?
+    uint2 pixelPosition = uint2(uv * resolution);
+    float depthPyramid = _SSR_PyramidDepth.SampleLevel(sampler_point_clamp, uv, 4).r;
 
     float depth = _CameraDepthTexture.SampleLevel(sampler_point_clamp, uv, 0.0f).r;
-
-    [branch]
-    if (depth <= 1e-7)
-    {
-        _SSR_RT[id.xy] = 0;
+    if (depth <= 1e-7) {
+        _SSR_Out_UVWPdf[id.xy] = 0;
+        _SSR_Out_ColorMask[id.xy] = 0;
         return;
     }
 
-    float4 gbuffer2 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer2, sampler_point_clamp, uv, 0);
-
+    float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_point_clamp, uv, 0);
     float3 worldNormal = UnpackNormal(gbuffer2.xyz);
-    half roughness = 1.0 - gbuffer2.w;
-    float3 viewNormal = TransformWorldToViewNormal(worldNormal);
+    half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
 
-    float3 screenPos = GetScreenPos(uv, depth);
-    float3 worldPos = ReconstructWorldPos(uv, depth);
-    float3 viewPos = GetViewPos(screenPos);
-    float3 viewDir = GetViewDir(worldPos);
-
-    uint2 random = Rand3DPCG16(uint3(id.xy, 0)).xy;
-    float2 hash = Hammersley16(0, (uint)_SSR_RayCounts, random);
-
-    hash.y = lerp(hash.y, 0.0, BRDF_BIAS);
-
-    half4 H = 0.0;
-    if (roughness > 0.1f)
-    {
-        // H = TangentToWorld(viewNormal, ImportanceSampleGGX(hash, roughness));
-        _SSR_RT[id.xy] = 0;
+    if (roughness > 0.1f) {
+        _SSR_Out_UVWPdf[id.xy] = 0;
+        _SSR_Out_ColorMask[id.xy] = 0;
         return;
     }
-    else
-    {
-        H = half4(viewNormal, 1.0);
+
+    //uv.y = 1 - uv.y; // flip y?
+    float3 NDCPos = Kaiser_GetNDCPos(float2(uv.x, uv.y), depth);
+    float3 worldPos = Kaiser_GetWorldPos(NDCPos);
+    float3 viewPos = Kaiser_GetViewPos(NDCPos);
+    float3 viewNormal = TransformWorldToViewNormal(worldNormal);
+    float3x3 tangentMatrix = GetTangentBasis(worldNormal);
+
+    uint frameIDMod8 = uint(fmod(0, 8));
+    uint2 random = Rand3DPCG16(uint3(id.xy, 0)).xy;
+    
+    float4 Out_UVWPdf = 0;
+    float4 Out_ColorMask = 0; 
+    int _SSR_RayCounts = 4;
+
+
+    [loop]
+    for (uint i = 0; i < (uint)_SSR_RayCounts; i++) {
+        float2 hash = Hammersley16(i, (uint)_SSR_RayCounts, random);
+        hash.y = lerp(hash.y, 0, BRDF_BIAS);
+
+        float4 lightDirTS = ImportanceSampleGGX(hash, roughness);
+        float3 lightDirWS = mul(lightDirTS.xyz, tangentMatrix);
+        float3 lightDirVS = TransformWorldToView(lightDirWS);
+        lightDirVS = reflect(normalize(viewPos), lightDirVS);
+
+        float level;
+        float3 HitUVz;
+
+        float3 rayStartScreen = NDCPos;
+        float4 rayEndScreen = mul(UNITY_MATRIX_P, float4(lightDirVS, 0.0)) + float4(rayStartScreen, 1.0);
+        rayEndScreen.xyz = (rayEndScreen.xyz / max(rayEndScreen.w, 1e-4));
+        float3 rayDepthScreen = 0.5 * (mul(UNITY_MATRIX_P, float4(0.0, 0.0, 1.0, 0.0)).xyz + rayStartScreen);
+        float3 rayStepScreen = (rayEndScreen.xyz - rayStartScreen);
+        rayStepScreen *= GetStepScreenFactorToClipAtScreenEdge(rayStartScreen.xy, rayStepScreen.xy);
+        float compareTolerance = max(abs(rayStepScreen.z), (rayStartScreen.z - rayDepthScreen.z) * 2);
+
+		float stepOffset = InterleavedGradientNoise(pixelPosition + 0.5, frameIDMod8);
+		stepOffset -= 0.9;
+        bool bHit = RayCast_Specular(
+            _Hiz_RaySteps, 0.15, compareTolerance, stepOffset, 
+            rayStartScreen, rayStepScreen, 
+            _SSR_PyramidDepth, sampler_point_clamp,
+            HitUVz, level
+        );
+
+        Out_UVWPdf.xyz += HitUVz;
+        Out_UVWPdf.w += lightDirTS.w;
+
+        [branch]
+        if (bHit) {
+            float3 sampleColor = _SSR_SceneColor_RT.SampleLevel(sampler_point_clamp, HitUVz.xy, 0).rgb;
+            sampleColor *= rcp(1 + Luminance(sampleColor));
+            Out_ColorMask += float4(sampleColor, GetScreenFadeBord(HitUVz.xy, 0.1f));
+        }
     }
 
-    float3 reflectionDir = reflect(normalize(viewPos), H.xyz);
+    Out_UVWPdf.xyz = normalize(Out_UVWPdf.xyz);
+    Out_UVWPdf.w /= _SSR_RayCounts;
 
-    float3 rayStart = float3(uv, depth);
-    float4 rayProj = mul(UNITY_MATRIX_P, float4(viewPos + reflectionDir, 1.0));
-    float3 rayDir = normalize((rayProj.xyz / rayProj.w) - screenPos);
-    rayDir.xy *= float2(0.5f, -0.5f);
+    Out_ColorMask /= _SSR_RayCounts;
+    Out_ColorMask.a = saturate( Out_ColorMask.a * Out_ColorMask.a );
+    Out_ColorMask.rgb *= rcp( 1 - Luminance(Out_ColorMask.rgb) );
 
-    float4 Hiz_Result = Hierarchical_Z_Trace(_Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel, 
-    _Hiz_RaySteps, _SSR_Thickness, _BufferSize.xy * 0.5f,
-    rayStart, rayDir, _SSR_HierarchicalDepth_RT);
-    // float4 Hiz_Result = HizTrace_Advanced(_Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-    // _Hiz_RaySteps, _SSR_Thickness, false,
-    // 0.005f, _BufferSize.xy,
-    // rayStart, rayDir, _SSR_HierarchicalDepth_RT);
-    
-    float4 sceneColor = _SSR_SceneColor_RT.SampleLevel(sampler_point_clamp, Hiz_Result.xy, 0.0f);
-    // _SSR_RT[id.xy] = float4(rayProj);
-    _SSR_RT[id.xy] = float4(sceneColor);
-    // _SSR_RT[id.xy] = float4(rayDir, 0.0);
-    // _SSR_RT[id.xy] = float4(reflectionDir.xy, -reflectionDir.z, 0.0);
-    // _SSR_RT[id.xy] = float4(viewPos.xy, -viewPos.z, 0.0);
-    // _SSR_RT[id.xy] = float4(hash, 0.0, 0.0);
-    // _SSR_RT[id.xy] = float4(viewNormal, 0.0);
+    _SSR_Out_UVWPdf[id.xy] = float4( Out_UVWPdf.xyz, max(1e-5, (Out_UVWPdf.w != 0) ? 1 / Out_UVWPdf.w : 0) );
+    _SSR_Out_ColorMask[id.xy] = Out_ColorMask * Out_ColorMask.a;
 }
 
 [numthreads(8, 8, 1)]
@@ -204,110 +232,72 @@ void SSR_URP_TEST (uint3 id : SV_DispatchThreadID)
     // float4 reflColor = SAMPLE_TEXTURE2D_X_LOD(_SSR_SceneColor_RT, sampler_point_clamp, Hiz_Result.xy, 0);
 
 
-    _SSR_RT[id.xy] = float4(0.0,0.0,1.0,0.0);
+    // _SSR_RT[id.xy] = float4(0.0,0.0,1.0,0.0);
 
 }
 
-// [numthreads(8,8,1)]
-// void SSR (uint3 id : SV_DispatchThreadID)
-// {
-//     // screen data
+// // screen data
 //     float2 resolution = _BufferSize.xy;
 //     float2 invResolution = _BufferSize.zw;
-//     float2 uv = (id.xy + 0.5) * invResolution;
-    
-//     // depth data
-//     float depth = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 0).x; // raw depth value has UNITY_REVERSED_Z applied on most platforms
+//     float2 uv = (id.xy + 0.1f) * invResolution;
 
-//     if (depth <= 1e-7) 
+//     float depth = _CameraDepthTexture.SampleLevel(sampler_point_clamp, uv, 0.0f).r;
+
+//     [branch]
+//     if (depth <= 1e-7)
 //     {
 //         _SSR_RT[id.xy] = 0;
 //         return;
 //     }
 
-//     half4 gbuffer0 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer0, sampler_point_clamp, uv, 0);
-//     half4 gbuffer1 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer1, sampler_point_clamp, uv, 0);
-//     half4 gbuffer2 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer2, sampler_point_clamp, uv, 0);
-    
-//     // gbuffer data
-//     half3 normalWS = UnpackNormal(SAMPLE_TEXTURE2D_X_LOD(_GBuffer2, sampler_point_clamp, uv, 0).xyz);
-//     half roughness = 1.0 - SAMPLE_TEXTURE2D_X_LOD(_GBuffer2, sampler_point_clamp, uv, 0).w;
-//     roughness = clamp(roughness, 0.02, 1);
-//     half3 normalVS = TransformWorldToView(normalWS);
+//     float4 gbuffer2 = SAMPLE_TEXTURE2D_X_LOD(_GBuffer2, sampler_point_clamp, uv, 0);
 
-//     // float4 clipSpace = float4(uv * 2 - 1, rawDepth, 1);
+//     float3 worldNormal = UnpackNormal(gbuffer2.xyz);
+//     half roughness = 1.0 - gbuffer2.w;
+//     float3 viewNormal = TransformWorldToViewNormal(worldNormal);
 
-//     float3 positionSS = float3(uv * 2 - 1, depth);
-//     positionSS.y *= -1;
-//     float3 positionWS = GetWorldSpacePosition(uv, depth);
-//     float3 positionVS = GetViewSpacePosition(positionSS);
-//     float3 viewDirWS = normalize(positionWS - GetCameraPositionWS());
-
-//     // prepare
-//     half Ray_HitMask = 0, Out_Fade = 0, Out_Mask = 0, Out_PDF = 0, Out_RayDepth = 0;
-//     half2 outUV = 0;
-//     half4 outColor = 0;
+//     float3 screenPos = GetScreenPos(uv, depth);
+//     float3 worldPos = ReconstructWorldPos(uv, depth);
+//     float3 viewPos = GetViewPos(screenPos);
+//     float3 viewDir = GetViewDir(worldPos);
 
 //     uint2 random = Rand3DPCG16(uint3(id.xy, 0)).xy;
 //     float2 hash = Hammersley16(0, (uint)_SSR_RayCounts, random);
-    
-    
-//     // very glossy
-//     float3 H = normalVS;
-//     [flatten]
-//     if (roughness > 0.1) {
-//         // diffuser ?
-//         H = mul(ImportanceSampleGGX(hash, roughness).xyz, GetTangentBasis(normalVS));
+
+//     hash.y = lerp(hash.y, 0.0, BRDF_BIAS);
+
+//     half4 H = 0.0;
+//     if (roughness > 0.1f)
+//     {
+//         // H = TangentToWorld(viewNormal, ImportanceSampleGGX(hash, roughness));
+//         _SSR_RT[id.xy] = 0;
+//         return;
 //     }
+//     else
+//     {
+//         H = half4(viewNormal, 1.0);
+//     }
+
+//     float3 reflectionDir = reflect(normalize(viewPos), H.xyz);
+
+//     float3 rayStart = float3(uv, depth);
+//     float4 rayProj = mul(UNITY_MATRIX_P, float4(viewPos + reflectionDir, 1.0));
+//     float3 rayDir = normalize((rayProj.xyz / rayProj.w) - screenPos);
+//     rayDir.xy *= float2(0.5f, -0.5f);
+
+//     float4 Hiz_Result = Hierarchical_Z_Trace(_Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel, 
+//     _Hiz_RaySteps, _SSR_Thickness, _BufferSize.xy * 0.5f,
+//     rayStart, rayDir, _SSR_HierarchicalDepth_RT);
+//     // float4 Hiz_Result = HizTrace_Advanced(_Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
+//     // _Hiz_RaySteps, _SSR_Thickness, false,
+//     // 0.005f, _BufferSize.xy,
+//     // rayStart, rayDir, _SSR_HierarchicalDepth_RT);
     
-//     float4 lightDirTS = ImportanceSampleGGX(hash, roughness);
-//     float3 lightDirWS = mul(lightDirTS.xyz, GetTangentBasis(normalWS));
-
-//     float3 reflectionDirVS = reflect(normalize(positionVS), H.xyz);
-
-//     // float3 lightDirVS = mul(UNITY_MATRIX_P, float4(lightDirWS, 1.0)).xyz;
-//     // lightDirVS = reflect(normalize(positionVS), lightDirVS);
-
-//     // float3 reflectionDirWS = reflect(viewDirWS, normalWS);
-//     // float3 reflectionDirVS = mul(UNITY_MATRIX_V, float4(reflectionDirWS, 0.0)).xyz;
-
-//     // float3 rayStartSS = positionSS;
-//     // float4 rayEndSS = mul(UNITY_MATRIX_P, float4(lightDirVS, 0.0)) + float4(rayStartSS, 1);
-//     // rayEndSS.xyz = rcp(max(rayEndSS.w, 1e-4)) * rayEndSS.xyz;
-//     // float3 rayDepthSS = 0.5 * (rayStartSS + mul(UNITY_MATRIX_P, float4(0, 0, 1, 0)).xyz);
-//     // float3 rayDirSS = normalize(rayEndSS.xyz - rayStartSS.xyz);
-//     // float3 rayStepSS = rayEndSS.xyz - rayStartSS;
-
-//     float3 rayStartSS = float3(uv, depth);
-//     float4 rayProjSS = mul(UNITY_MATRIX_P, float4(positionVS + reflectionDirVS, 1.0));
-//     float3 rayDirSS = normalize(rayProjSS.xyz * rcp(max(rayProjSS.w, 1e-4)) - positionSS);
-//     // rayDirSS.xy *= 0.5;
-
-//     // HizTrace_Base
-//     // float hizDepth = _SSR_HierarchicalDepth_RT.SampleLevel(sampler_point_clamp, uv, 4).x;
-
-//     // float4 Hiz_Result = HizTrace_Base(
-//     //     _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-//     //     _Hiz_RaySteps, _SSR_Thickness, _BufferSize.zw,
-//     //     rayStartSS, rayDirSS,
-//     //     _SSR_HierarchicalDepth_RT, sampler_point_clamp
-//     // );
-
-//     float4 Hiz_Result = HizTrace_Advanced(
-//         _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-//         _Hiz_RaySteps, _SSR_Thickness, true,
-//         0.0005f, _BufferSize.xy,
-//         rayStartSS, rayDirSS, _SSR_HierarchicalDepth_RT
-//     );
-
-//     float4 sceneColor = SAMPLE_TEXTURE2D_X_LOD(_SSR_SceneColor_RT, sampler_point_clamp, uv, 0);
-//     float4 reflColor = SAMPLE_TEXTURE2D_X_LOD(_SSR_SceneColor_RT, sampler_point_clamp, Hiz_Result.xy, 0);
-
-//     // _SSR_RT[id.xy] = float4(hizDepth, 0.0, 0.0, 0.0);
-//     // _SSR_RT[id.xy] = float4(Hiz_Result.xyz, 1.0);
-//     // _SSR_RT[id.xy] = float4(rayDirSS.xyz, 1.0);
-//     // _SSR_RT[id.xy] = float4(Hiz_Result);
-//     _SSR_RT[id.xy] = float4(reflColor);
-//     // _SSR_RT[id.xy] = float4(_ZBufferParams / 10.0);
-//     // _SSR_RT[id.xy] = float4(rayDirSS, 1.0);
-// }
+//     float4 sceneColor = _SSR_SceneColor_RT.SampleLevel(sampler_point_clamp, Hiz_Result.xy, 0.0f);
+//     // _SSR_RT[id.xy] = float4(rayProj);
+//     _SSR_RT[id.xy] = float4(sceneColor);
+//     // _SSR_RT[id.xy] = float4(rayDir, 0.0);
+//     // _SSR_RT[id.xy] = float4(reflectionDir.xy, -reflectionDir.z, 0.0);
+//     // _SSR_RT[id.xy] = float4(viewPos.xy, -viewPos.z, 0.0);
+//     // _SSR_RT[id.xy] = float4(hash, 0.0, 0.0);
+//     // _SSR_RT[id.xy] = float4(viewNormal, 0.0);

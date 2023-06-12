@@ -16,19 +16,12 @@ public class PyramidDepthRenderPass : ScriptableRenderPass
 
     private PyramidDepthSettings settings; //基本参数
     private int[] pyramidMipIDs;
+    int pyramidDepth_ID = Shader.PropertyToID("_PyramidDepth");
 
     private RenderTexture pyramidDepthRT;
     public PyramidDepthRenderPass(PyramidDepthSettings settings)
     {
         this.settings = settings;
-        // if (settings.debugEnabled)
-        // {
-        //     this.renderPassEvent = RenderPassEvent.AfterRendering;
-        // }
-        // else
-        // {
-
-        // }
         this.renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
         profilingSampler = new ProfilingSampler("[Kaiser] Pyramid Depth");
 
@@ -50,21 +43,22 @@ public class PyramidDepthRenderPass : ScriptableRenderPass
 
         using (new ProfilingScope(cmd, profilingSampler))
         {
-            int2 bufferSize = new int2(renderingData.cameraData.cameraTargetDescriptor.width, renderingData.cameraData.cameraTargetDescriptor.height);
+            // int2 bufferSize = new int2(renderingData.cameraData.cameraTargetDescriptor.width, renderingData.cameraData.cameraTargetDescriptor.height);
+            int2 bufferSize = new int2(1024, 1024);
             int2 lastBufferSize = bufferSize;
 
             RenderTextureDescriptor descriptor = new RenderTextureDescriptor((int)bufferSize.x, (int)bufferSize.y, 0);
             descriptor.colorFormat = RenderTextureFormat.RFloat;
             descriptor.sRGB = false;
             descriptor.useMipMap = true;
-            descriptor.autoGenerateMips = true;
-            RenderTexture.ReleaseTemporary(pyramidDepthRT);
-            pyramidDepthRT = RenderTexture.GetTemporary(descriptor);
+            descriptor.autoGenerateMips = false;
 
-            cmd.Blit(renderingData.cameraData.renderer.cameraDepthTargetHandle, pyramidDepthRT);
+            // RenderTexture.ReleaseTemporary(pyramidDepthRT);
+            // pyramidDepthRT = RenderTexture.GetTemporary(descriptor);
+            cmd.GetTemporaryRT(pyramidDepth_ID, descriptor);
+            cmd.Blit(renderingData.cameraData.renderer.cameraDepthTargetHandle, pyramidDepth_ID);
 
-            RenderTargetIdentifier pyramidDepthTexture = new RenderTargetIdentifier(pyramidDepthRT);
-            RenderTargetIdentifier lastPyramidDepthTexture = pyramidDepthRT;
+            RenderTargetIdentifier lastPyramidDepthTexture = pyramidDepth_ID;
 
             for (int i = 0; i < settings.mipCount; ++i)
             {
@@ -80,19 +74,15 @@ public class PyramidDepthRenderPass : ScriptableRenderPass
                 cmd.SetComputeTextureParam(settings.computeShader, 0, PyramidDepthShaderIDs.PrevMipDepth, lastPyramidDepthTexture);
                 cmd.SetComputeTextureParam(settings.computeShader, 0, PyramidDepthShaderIDs.HierarchicalDepth, pyramidMipIDs[i]);
                 cmd.DispatchCompute(settings.computeShader, 0, dispatchSizeX, dispatchSizeY, 1);
-                cmd.CopyTexture(pyramidMipIDs[i], 0, 0, pyramidDepthTexture, 0, i + 1);
+                cmd.CopyTexture(pyramidMipIDs[i], 0, 0, pyramidDepth_ID, 0, i + 1);
 
                 lastBufferSize = bufferSize;
                 lastPyramidDepthTexture = pyramidMipIDs[i];
+            }
 
-                if (settings.debugEnabled)
-                {
-                    cmd.Blit(lastPyramidDepthTexture, colorAttachmentHandle);
-                }
-
-
-
-
+            if (settings.debugEnabled)
+            {
+                cmd.Blit(pyramidDepth_ID, colorAttachmentHandle);
             }
 
             for (int j = 0; j < settings.mipCount; ++j)
