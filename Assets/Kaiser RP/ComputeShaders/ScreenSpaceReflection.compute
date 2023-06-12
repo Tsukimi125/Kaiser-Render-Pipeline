@@ -73,7 +73,7 @@ void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
     }
 
     //uv.y = 1 - uv.y; // flip y?
-    float3 NDCPos = Kaiser_GetNDCPos(float2(uv.x, uv.y), depth);
+    float3 NDCPos = Kaiser_GetNDCPos(float2(uv.x, 1-uv.y), depth);
     float3 worldPos = Kaiser_GetWorldPos(NDCPos);
     float3 viewPos = Kaiser_GetViewPos(NDCPos);
     float3 viewNormal = TransformWorldToViewNormal(worldNormal);
@@ -103,8 +103,8 @@ void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
         float3 rayStartScreen = NDCPos;
         float4 rayEndScreen = mul(UNITY_MATRIX_P, float4(lightDirVS, 0.0)) + float4(rayStartScreen, 1.0);
         rayEndScreen.xyz = (rayEndScreen.xyz / max(rayEndScreen.w, 1e-4));
-        float3 rayDepthScreen = 0.5 * (mul(UNITY_MATRIX_P, float4(0.0, 0.0, 1.0, 0.0)).xyz + rayStartScreen);
-        float3 rayStepScreen = (rayEndScreen.xyz - rayStartScreen);
+        float3 rayDepthScreen = 0.5 * (mul(UNITY_MATRIX_P, float4(0, 0, 1, 0)).xyz + rayStartScreen);
+        float3 rayStepScreen = rayEndScreen.xyz - rayStartScreen;
         rayStepScreen *= GetStepScreenFactorToClipAtScreenEdge(rayStartScreen.xy, rayStepScreen.xy);
         float compareTolerance = max(abs(rayStepScreen.z), (rayStartScreen.z - rayDepthScreen.z) * 2);
 
@@ -117,6 +117,7 @@ void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
             HitUVz, level
         );
 
+        Out_UVWPdf.xyz += HitUVz;
         Out_UVWPdf.xyz += HitUVz;
         Out_UVWPdf.w += lightDirTS.w;
 

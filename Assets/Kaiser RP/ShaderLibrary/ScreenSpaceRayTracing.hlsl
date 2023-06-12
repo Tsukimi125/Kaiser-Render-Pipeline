@@ -93,7 +93,7 @@ bool RayCast_Specular(
 			}
 
 			float Time1 = Time0 + 1;
-		#if 0
+		#if 1
 			// Binary search
 			for( uint j = 0; j < 4; j++ )
 			{

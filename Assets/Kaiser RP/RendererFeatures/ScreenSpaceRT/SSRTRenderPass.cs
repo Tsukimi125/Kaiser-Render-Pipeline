@@ -60,7 +60,7 @@ public class SSRTRenderPass : ScriptableRenderPass
             int height = renderingData.cameraData.cameraTargetDescriptor.height;
  
             RenderTextureDescriptor descriptor0 = new RenderTextureDescriptor(
-                width, height, RenderTextureFormat.Default, 0, 0);
+                1024, 1024, RenderTextureFormat.Default, 0, 0);
             descriptor0.sRGB = false;
             descriptor0.enableRandomWrite = true;
             RenderTextureDescriptor descriptor1 = new RenderTextureDescriptor(
