@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-6782012916456606115
+--- !u!114 &-8728689468173685117
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -9,20 +9,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 383388d925bbc7645bdf98a5c98a8dae, type: 3}
-  m_Name: AO
+  m_Script: {fileID: 11500000, guid: a62d94edd4db7c94bab8e4717093e483, type: 3}
+  m_Name: PyramidDepth
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
-    passEvent: 550
-    computeShader: {fileID: 7200000, guid: 13a79d6cf36d27141a47b7bd78c640ca, type: 3}
-    blueNoiseTexture: {fileID: 2800000, guid: c90ba70611859b047aa23cd6eba14bd3, type: 3}
-    aoType: 1
-    intensity: 1
-    aoRadius: 1.5
-    maxDistance: 25
-    directionCount: 8
-    sampleCount: 8
+    computeShader: {fileID: 7200000, guid: 3923aa8f3198eea49acead9f17de170b, type: 3}
+    mipCount: 10
+    debugEnabled: 0
+    debugMip: 0
 --- !u!114 &-3915427986871945859
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -41,11 +36,12 @@ MonoBehaviour:
     shader: {fileID: 4800000, guid: b7fd1199a758b0d439cb5c1002b0850b, type: 3}
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
     noiseTex: {fileID: 0}
-    SSR_Thickness: 0.598
-    Hiz_MaxLevel: 4
+    SSR_Thickness: 0.1
+    Hiz_MaxLevel: 8
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
-    Hiz_RaySteps: 100
+    Hiz_RaySteps: 88
+    debugMode: 0
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -62,10 +58,9 @@ MonoBehaviour:
     debugReplacementPS: {fileID: 4800000, guid: cf852408f2e174538bcd9b7fda1c5ae7, type: 3}
     hdrDebugViewPS: {fileID: 4800000, guid: 573620ae32aec764abd4d728906d2587, type: 3}
   m_RendererFeatures:
-  - {fileID: -6782012916456606115}
-  - {fileID: 6982849082673399995}
+  - {fileID: -8728689468173685117}
   - {fileID: -3915427986871945859}
-  m_RendererFeatureMap: 5d367e642f73e1a1bb08e9743e10e8607df5dfa2fd9aa9c9
+  m_RendererFeatureMap: 836ed0de2c77dd867df5dfa2fd9aa9c9
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -103,22 +98,3 @@ MonoBehaviour:
   m_CopyDepthMode: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 1
---- !u!114 &6982849082673399995
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 11f599b346a5cb844ac95d22382f8cc0, type: 3}
-  m_Name: VolumetricLight
-  m_EditorClassIdentifier: 
-  m_Active: 1
-  settings:
-    computeShader: {fileID: 7200000, guid: ad4dd7ce777488644af69fe6dffe9fca, type: 3}
-    renderPassEvent: 500
-    raymarchingMaxSteps: 64
-    raymarchingStepSize: 1
-    raymarchingMaxDistance: 100

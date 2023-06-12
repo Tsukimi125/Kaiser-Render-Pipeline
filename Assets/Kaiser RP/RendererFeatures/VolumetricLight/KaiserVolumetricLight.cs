@@ -8,7 +8,7 @@ public class KaiserVolumetricLight : ScriptableRendererFeature
 {
     // Start is called before the first frame update
     public VolumetricLightRenderPass volumetricLightRenderPass;
-    
+
     [System.Serializable]
     public class Settings
     {

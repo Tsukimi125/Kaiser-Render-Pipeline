@@ -17,14 +17,23 @@ public class SSRTRenderPass : ScriptableRenderPass
     RenderTexture SSR_HierarchicalDepth_RT, SSR_HierarchicalDepth_BackUp_RT;
     Matrix4x4 SSR_ProjectionMatrix;
 
-    enum Pass {
+    enum Pass
+    {
         PrepareHiz,
     }
 
     public SSRTRenderPass(SSRTSettings settings)
     {
         this.settings = settings;
-        this.renderPassEvent = settings.passEvent; //设置Pass的渲染时机
+
+        if (settings.debugMode != SSRTSettings.DebugMode.None)
+        {
+            this.renderPassEvent = RenderPassEvent.AfterRendering;
+        }
+        else
+        {
+            this.renderPassEvent = settings.passEvent; //设置Pass的渲染时机
+        }
         profilingSampler = new ProfilingSampler("[Kaiser] ScreenSpaceRT");
     }
 
@@ -37,7 +46,7 @@ public class SSRTRenderPass : ScriptableRenderPass
             //通过此方法创建所需材质
             material = CoreUtils.CreateEngineMaterial(settings.shader);
         }
-        
+
 
     }
 
@@ -70,15 +79,16 @@ public class SSRTRenderPass : ScriptableRenderPass
             // Hi-Z Buffer
             cmd.GetTemporaryRT(SSR_HierarchicalDepth_ID, Hiz_Descriptor);
             cmd.GetTemporaryRT(SSR_HierarchicalDepth_BackUp_ID, Hiz_Descriptor);
-            
+
             cmd.Blit(Shader.GetGlobalTexture("_CameraDepthTexture"), SSR_HierarchicalDepth_ID);
-            
+
             //set Hiz-depth RT
-            for (int i = 0; i < settings.Hiz_MaxLevel; i++) {
-               cmd.SetGlobalInt("_SSR_HiZ_PrevDepthLevel", i);
-               cmd.SetRenderTarget(SSR_HierarchicalDepth_BackUp_ID, i + 1);
-               cmd.DrawProcedural(Matrix4x4.identity, material, (int)Pass.PrepareHiz, MeshTopology.Triangles, 3);
-               cmd.CopyTexture(SSR_HierarchicalDepth_BackUp_ID, 0, i + 1, SSR_HierarchicalDepth_ID, 0, i + 1);
+            for (int i = 0; i < settings.Hiz_MaxLevel; i++)
+            {
+                cmd.SetGlobalInt("_SSR_HiZ_PrevDepthLevel", i);
+                cmd.SetRenderTarget(SSR_HierarchicalDepth_BackUp_ID, i + 1);
+                cmd.DrawProcedural(Matrix4x4.identity, material, (int)Pass.PrepareHiz, MeshTopology.Triangles, 3);
+                cmd.CopyTexture(SSR_HierarchicalDepth_BackUp_ID, 0, i + 1, SSR_HierarchicalDepth_ID, 0, i + 1);
             }
             // cmd.SetGlobalTexture(SSR_HierarchicalDepth_ID, SSR_HierarchicalDepth_RT);
 
@@ -98,6 +108,12 @@ public class SSRTRenderPass : ScriptableRenderPass
             cmd.SetComputeFloatParam(settings.computeShader, "_SSR_Thickness", settings.SSR_Thickness);
             cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjectionMatrix", SSR_ProjectionMatrix);
             cmd.DispatchCompute(settings.computeShader, ssrKernel, width / 8, height / 8, 1);
+
+            // if (settings.debugMode != SSRTSettings.DebugMode.None)
+            // {
+            //     cmd.Blit(SSR_RT_ID, colorAttachmentHandle);
+            // }
+
             cmd.ReleaseTemporaryRT(SSR_RT_ID);
 
         }
