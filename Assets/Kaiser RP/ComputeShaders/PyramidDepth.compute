@@ -4,9 +4,11 @@
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 
-float4 _PrevCurr_Inverse_Size;
-Texture2D<float> _PrevMipDepth;
-RWTexture2D<float> _HierarchicalDepth;
+int _SampleLevel;
+float4 _InvBufferSize;
+
+Texture2D<float> _SSR_HierarchicalDepth_RT;
+RWTexture2D<float> _SSR_Target;
 SAMPLER(sampler_point_clamp);
 
 #if UNITY_REVERSED_Z
@@ -18,7 +20,7 @@ SAMPLER(sampler_point_clamp);
 [numthreads(8,8,1)]
 void Hiz_Buffer_Generation(uint3 id : SV_DispatchThreadID)
 {
-    float2 uv = (id.xy + 0.5) * _PrevCurr_Inverse_Size.xy;
+    float2 uv = (id.xy + 0.5) * _InvBufferSize.xy;
     
     /*FinalMinZ = max( FinalMinZ, _PrevMipDepth.SampleLevel(sampler_PrevMipDepth, uv + int2( 1,  0) * _PrevCurr_Inverse_Size.zw, 0) );
     FinalMinZ = max( FinalMinZ, _PrevMipDepth.SampleLevel(sampler_PrevMipDepth, uv + int2(-1,  0) * _PrevCurr_Inverse_Size.zw, 0) );
@@ -28,10 +30,10 @@ void Hiz_Buffer_Generation(uint3 id : SV_DispatchThreadID)
     FinalMinZ = max( FinalMinZ, _PrevMipDepth.SampleLevel(sampler_PrevMipDepth, uv + int2(-1,  1) * _PrevCurr_Inverse_Size.zw, 0) );
     FinalMinZ = max( FinalMinZ, _PrevMipDepth.SampleLevel(sampler_PrevMipDepth, uv + int2( 1, -1) * _PrevCurr_Inverse_Size.zw, 0) );
     FinalMinZ = max( FinalMinZ, _PrevMipDepth.SampleLevel(sampler_PrevMipDepth, uv + int2(-1, -1) * _PrevCurr_Inverse_Size.zw, 0) );*/
-    float FinalMinZ = _PrevMipDepth.SampleLevel(sampler_point_clamp, uv, 0);
-    FinalMinZ = MIN_DEPTH(FinalMinZ, _PrevMipDepth.SampleLevel(sampler_point_clamp, uv, 0, int2(0, -1)));
-    FinalMinZ = MIN_DEPTH(FinalMinZ, _PrevMipDepth.SampleLevel(sampler_point_clamp, uv, 0, int2(-1, 0)));
-    FinalMinZ = MIN_DEPTH(FinalMinZ, _PrevMipDepth.SampleLevel(sampler_point_clamp, uv, 0, int2(-1, -1)));
+    float FinalMinZ = _SSR_HierarchicalDepth_RT.SampleLevel(sampler_point_clamp, uv, _SampleLevel, int2(1, 1));
+    FinalMinZ = MIN_DEPTH(FinalMinZ, _SSR_HierarchicalDepth_RT.SampleLevel(sampler_point_clamp, uv, _SampleLevel, int2(1, -1)));
+    FinalMinZ = MIN_DEPTH(FinalMinZ, _SSR_HierarchicalDepth_RT.SampleLevel(sampler_point_clamp, uv, _SampleLevel, int2(-1, 1)));
+    FinalMinZ = MIN_DEPTH(FinalMinZ, _SSR_HierarchicalDepth_RT.SampleLevel(sampler_point_clamp, uv, _SampleLevel, int2(-1, -1)));
     
-    _HierarchicalDepth[id.xy] = FinalMinZ;
+    _SSR_Target[id.xy] = FinalMinZ;
 }

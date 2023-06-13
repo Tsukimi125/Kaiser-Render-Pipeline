@@ -55,22 +55,36 @@ public class SSRTRenderPass : ScriptableRenderPass
         using (new ProfilingScope(cmd, profilingSampler))
         {
             cmd.BeginSample("Ray Tracing");
+            {
+                
+            }
             // Prepare
             int width = renderingData.cameraData.cameraTargetDescriptor.width;
             int height = renderingData.cameraData.cameraTargetDescriptor.height;
- 
+
+            Matrix4x4 projMatrix = GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, false);
+            Matrix4x4 invProjMatrix = GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, false).inverse;
+            Matrix4x4 invViewMatrix = renderingData.cameraData.camera.cameraToWorldMatrix;
+            Matrix4x4 invViewProjMatrix = renderingData.cameraData.camera.cameraToWorldMatrix * 
+                GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, false).inverse;
+
+            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjMatrix", projMatrix);
+            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewMatrix", invViewMatrix);
+            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvProjMatrix", invProjMatrix);
+            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewProjMatrix", invViewProjMatrix);
+
             RenderTextureDescriptor descriptor0 = new RenderTextureDescriptor(
-                1024, 1024, RenderTextureFormat.Default, 0, 0);
+                width, height, RenderTextureFormat.Default, 0, 0);
             descriptor0.sRGB = false;
             descriptor0.enableRandomWrite = true;
             RenderTextureDescriptor descriptor1 = new RenderTextureDescriptor(
                 width, height, RenderTextureFormat.Default, 0, 0);
             descriptor1.sRGB = false;
             descriptor1.enableRandomWrite = true;
-            RenderTextureDescriptor descriptor2 = new RenderTextureDescriptor(
-                width, height, RenderTextureFormat.Default, 0, 0);
-            descriptor2.sRGB = false;
-            descriptor2.enableRandomWrite = true;
+            RenderTextureDescriptor descriptorMask = new RenderTextureDescriptor(
+                width, height, RenderTextureFormat.R8, 0, 0);
+            descriptorMask.sRGB = false;
+            descriptorMask.enableRandomWrite = true;
 
             cmd.SetComputeVectorParam(settings.computeShader, "_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
 
@@ -79,17 +93,20 @@ public class SSRTRenderPass : ScriptableRenderPass
             // Init Input
             cmd.GetTemporaryRT(SSR_InputIDs.SceneColor, descriptor0);
             cmd.Blit(Shader.GetGlobalTexture("_BlitTexture"), SSR_InputIDs.SceneColor);
+            
+            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjMatrix", projMatrix);
+            cmd.SetComputeMatrixParam(settings.computeShader, " ", invViewMatrix);
+            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvProjMatrix", invProjMatrix);
+            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewProjMatrix", invViewProjMatrix);
 
             cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_SceneColor_RT", SSR_InputIDs.SceneColor);
             cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_PyramidDepth", pyramidDepth_ID);  
 
             // Init Output
             cmd.GetTemporaryRT(SSR_OutputIDs.UVWPdf, descriptor1);
-            cmd.GetTemporaryRT(SSR_OutputIDs.ColorMask, descriptor2);
+            cmd.GetTemporaryRT(SSR_OutputIDs.ColorMask, descriptorMask);
             cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_UVWPdf", SSR_OutputIDs.UVWPdf);
             cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_ColorMask", SSR_OutputIDs.ColorMask);
-
-            
 
             // Init Hiz Trace Settings
             cmd.SetComputeIntParam(settings.computeShader, "_Hiz_MaxLevel", settings.Hiz_MaxLevel);
@@ -97,6 +114,7 @@ public class SSRTRenderPass : ScriptableRenderPass
             cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StopLevel", settings.Hiz_StopLevel);
             cmd.SetComputeIntParam(settings.computeShader, "_Hiz_RaySteps", settings.Hiz_RaySteps);
             cmd.SetComputeFloatParam(settings.computeShader, "_SSR_Thickness", settings.SSR_Thickness);
+            cmd.SetComputeFloatParam(settings.computeShader, "_SSR_ScreenFade", settings.SSR_ScreenFade);
 
             cmd.DispatchCompute(settings.computeShader, k1, width / 8, height / 8, 1);
 

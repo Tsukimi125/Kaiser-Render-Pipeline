@@ -36,11 +36,11 @@ MonoBehaviour:
     shader: {fileID: 4800000, guid: b7fd1199a758b0d439cb5c1002b0850b, type: 3}
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
     noiseTex: {fileID: 0}
-    SSR_Thickness: 0.1
-    Hiz_MaxLevel: 8
+    SSR_Thickness: 0.188
+    Hiz_MaxLevel: 10
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
-    Hiz_RaySteps: 88
+    Hiz_RaySteps: 64
     debugMode: 0
 --- !u!114 &11400000
 MonoBehaviour:

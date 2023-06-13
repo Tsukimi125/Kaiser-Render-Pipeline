@@ -9,14 +9,15 @@ public class PyramidDepthRenderPass : ScriptableRenderPass
 {
     public static class PyramidDepthShaderIDs
     {
-        public static int PrevMipDepth = Shader.PropertyToID("_PrevMipDepth");
-        public static int HierarchicalDepth = Shader.PropertyToID("_HierarchicalDepth");
+        public static int HierarchicalDepth = Shader.PropertyToID("_SSR_HierarchicalDepth_RT");
+        public static int Target = Shader.PropertyToID("_SSR_Target");
         public static int PrevCurr_InvSize = Shader.PropertyToID("_PrevCurr_Inverse_Size");
     }
 
     private PyramidDepthSettings settings; //基本参数
     private int[] pyramidMipIDs;
     int pyramidDepth_ID = Shader.PropertyToID("_PyramidDepth");
+    int pyramidDepth_BackUp_ID = Shader.PropertyToID("_PyramidDepth_BackUp");
 
     private RenderTexture pyramidDepthRT;
     public PyramidDepthRenderPass(PyramidDepthSettings settings)
@@ -43,9 +44,7 @@ public class PyramidDepthRenderPass : ScriptableRenderPass
 
         using (new ProfilingScope(cmd, profilingSampler))
         {
-            // int2 bufferSize = new int2(renderingData.cameraData.cameraTargetDescriptor.width, renderingData.cameraData.cameraTargetDescriptor.height);
-            int2 bufferSize = new int2(1024, 1024);
-            int2 lastBufferSize = bufferSize;
+            int2 bufferSize = new int2(renderingData.cameraData.cameraTargetDescriptor.width, renderingData.cameraData.cameraTargetDescriptor.height);
 
             RenderTextureDescriptor descriptor = new RenderTextureDescriptor((int)bufferSize.x, (int)bufferSize.y, 0);
             descriptor.colorFormat = RenderTextureFormat.RFloat;
@@ -53,31 +52,29 @@ public class PyramidDepthRenderPass : ScriptableRenderPass
             descriptor.useMipMap = true;
             descriptor.autoGenerateMips = false;
 
-            // RenderTexture.ReleaseTemporary(pyramidDepthRT);
-            // pyramidDepthRT = RenderTexture.GetTemporary(descriptor);
             cmd.GetTemporaryRT(pyramidDepth_ID, descriptor);
+
             cmd.Blit(renderingData.cameraData.renderer.cameraDepthTargetHandle, pyramidDepth_ID);
 
-            RenderTargetIdentifier lastPyramidDepthTexture = pyramidDepth_ID;
-
+            int2 mipSize = bufferSize;
             for (int i = 0; i < settings.mipCount; ++i)
             {
-                bufferSize.x /= 2;
-                bufferSize.y /= 2;
+                mipSize.x /= 2;
+                mipSize.y /= 2;
 
-                int dispatchSizeX = Mathf.CeilToInt(bufferSize.x / 8);
-                int dispatchSizeY = Mathf.CeilToInt(bufferSize.y / 8);
-                if (dispatchSizeX < 1 || dispatchSizeY < 1) break;
+                if(mipSize.x < 1 || mipSize.y < 1)
+                {
+                    break;
+                }
 
-                cmd.GetTemporaryRT(pyramidMipIDs[i], bufferSize.x, bufferSize.y, 0, FilterMode.Point, RenderTextureFormat.RFloat, RenderTextureReadWrite.Default, 1, true);
-                cmd.SetComputeVectorParam(settings.computeShader, PyramidDepthShaderIDs.PrevCurr_InvSize, new float4(1.0f / bufferSize.x, 1.0f / bufferSize.y, 1.0f / lastBufferSize.x, 1.0f / lastBufferSize.y));
-                cmd.SetComputeTextureParam(settings.computeShader, 0, PyramidDepthShaderIDs.PrevMipDepth, lastPyramidDepthTexture);
-                cmd.SetComputeTextureParam(settings.computeShader, 0, PyramidDepthShaderIDs.HierarchicalDepth, pyramidMipIDs[i]);
-                cmd.DispatchCompute(settings.computeShader, 0, dispatchSizeX, dispatchSizeY, 1);
+                cmd.GetTemporaryRT(pyramidMipIDs[i], mipSize.x, mipSize.y, 0, FilterMode.Point, RenderTextureFormat.RFloat, RenderTextureReadWrite.Default, 1, true);
+                cmd.SetComputeIntParam(settings.computeShader, "_SampleLevel", i);
+                cmd.SetComputeVectorParam(settings.computeShader, "_InvBufferSize", new float4(1.0f / mipSize.x, 1.0f / mipSize.y, 0.0f, 0.0f));
+
+                cmd.SetComputeTextureParam(settings.computeShader, 0, "_SSR_HierarchicalDepth_RT", pyramidDepth_ID);
+                cmd.SetComputeTextureParam(settings.computeShader, 0, "_SSR_Target", pyramidMipIDs[i]);
+                cmd.DispatchCompute(settings.computeShader, 0, bufferSize.x / 8, bufferSize.y / 8, 1);
                 cmd.CopyTexture(pyramidMipIDs[i], 0, 0, pyramidDepth_ID, 0, i + 1);
-
-                lastBufferSize = bufferSize;
-                lastPyramidDepthTexture = pyramidMipIDs[i];
             }
 
             if (settings.debugEnabled)

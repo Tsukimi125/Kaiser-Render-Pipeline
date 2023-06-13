@@ -12,10 +12,13 @@ public class SSRTSettings
     public Shader shader; //所用Shader
     public ComputeShader computeShader; //所用ComputeShader
     public Texture2D noiseTex; //蓝噪声纹理
-
+    [Header("SSR_Global")]
     [Range(0, 1)]
     public float SSR_Thickness = 0.1f; //SSR分辨率
+    [Range(0, 1)]
+    public float SSR_ScreenFade = 0.1f; //SSR屏幕淡出
 
+    [Header("Hiz Trace")]
     [Range(0, 10)]
     public int Hiz_MaxLevel = 7;
     [Range(0, 10)]
@@ -24,6 +27,18 @@ public class SSRTSettings
     public int Hiz_StopLevel = 0;
     [Range(0, 256)]
     public int Hiz_RaySteps = 64;
+
+    [Header("Filtering")]
+    [Range(0, 10)]
+    public int Spatial_Resolve = 9;
+    [Range(0, 0.99f)]
+    [SerializeField]
+    public float Temporal_Weight = 0.98f;
+
+    [Range(1, 5)]
+    [SerializeField]
+    public float Temporal_Scale = 1.25f;
+
 
     public enum DebugMode
     {
