@@ -1,5 +1,6 @@
 #pragma kernel SSR_RayTracing
 
+
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
@@ -18,9 +19,9 @@
 RWTexture2D<float4> _SSR_Out_UVWPdf;
 RWTexture2D<float4> _SSR_Out_ColorMask;
 
-float4 _SSR_Jitter;
+int _SSR_FrameIndex;
 
-Texture2D _SSR_PyramidDepth;
+Texture2D _SSR_PyramidDepth_RT;
 
 TEXTURE2D_X(_CameraDepthTexture);
 
@@ -30,9 +31,9 @@ TEXTURE2D_X_HALF(_GBuffer1);
 TEXTURE2D_X_HALF(_GBuffer2);
 SAMPLER(sampler_point_clamp);
 SAMPLER(sampler_linear_clamp);
+SAMPLER(sampler_bilinear_clamp);
 
-float4 _BufferSize;
-
+float4 _SSR_BufferSize;
 
 float4x4 _SSR_ProjMatrix;
 float4x4 _SSR_InvViewMatrix;
@@ -49,20 +50,20 @@ int _Hiz_RaySteps;
 [numthreads(8, 8, 1)]
 void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
 {
-    float2 resolution = _BufferSize.xy;
-    float2 invResolution = _BufferSize.zw;
+    float2 resolution = _SSR_BufferSize.xy;
+    float2 invResolution = _SSR_BufferSize.zw;
     float2 uv = (id.xy + 0.5) * invResolution;
 
     // TODO: USE THIS?
     uint2 pixelPosition = uint2(uv * resolution);
-  
+    
     float depth = _CameraDepthTexture.SampleLevel(sampler_point_clamp, uv, 0.0f).r;
-    // if (depth <= 1e-7) {
-    //     _SSR_Out_UVWPdf[id.xy] = 0;
-    //     _SSR_Out_ColorMask[id.xy] = 0;
-    //     return;
-    // }
-    float eyeDepth = LinearEyeDepth(depth, _ZBufferParams);
+    if (depth <= 1e-7)
+    {
+        _SSR_Out_UVWPdf[id.xy] = 0;
+        _SSR_Out_ColorMask[id.xy] = 0;
+        return;
+    }
 
     float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_point_clamp, uv, 0);
     half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
@@ -71,18 +72,18 @@ void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
 
     float4 NDCPos = ComputeClipSpacePosition(uv, depth);
     float3 worldPos = ComputeWorldSpacePosition(uv, depth, _SSR_InvViewProjMatrix);
-    float3 viewPos = ComputeViewSpacePosition(uv, depth, UNITY_MATRIX_I_P);
+    float3 viewPos = ComputeViewSpacePosition(uv, depth, _SSR_InvProjMatrix);
     viewPos.z = -viewPos.z;
-    
+    _SSR_Out_UVWPdf[id.xy] = float4(worldPos, 1.0);
     // rand gen
-    int _SSR_RayCounts = 4;
-    uint frameIDMod8 = uint(fmod(0, 8));
-    uint2 random = Rand3DPCG16(uint3(id.xy, _SSR_RayCounts)).xy;
-    float2 hash = Hammersley16(0, (uint)_SSR_RayCounts, random);
+
+    uint frameIDMod8 = uint(fmod(_SSR_FrameIndex, 8));
+    uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
+    float2 hash = Hammersley16(0, (uint)1, random);
     hash.y = lerp(hash.y, 0, BRDF_BIAS);
 
     float4 H = float4(0, 0, 0, 0);
-    if(roughness > 0.1)
+    if (roughness > 0.1)
     {
         H = TangentToWorld(ImportanceSampleGGX(hash, roughness).xyz, float4(viewNormal, 1.0));
     }
@@ -93,22 +94,114 @@ void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
     float3 reflectionDir = reflect(normalize(viewPos), H.xyz);
 
     float3 rayStart = float3(uv, depth);
-	float4 rayProj = mul (UNITY_MATRIX_P, float4(viewPos + reflectionDir, 1.0));
-	float3 rayDir = normalize( (rayProj.xyz / rayProj.w) - NDCPos.xyz);
-	rayDir.xy *= float2(0.5f, -0.5f);
+    float4 rayProj = mul(_SSR_ProjMatrix, float4(viewPos + reflectionDir, 1.0));
+    float3 rayDir = normalize((rayProj.xyz / rayProj.w) - NDCPos.xyz);
+    rayDir.xy *= float2(0.5f, -0.5f);
 
     float4 RayHitData = Hierarchical_Z_Trace(
-        _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel, 
-        _Hiz_RaySteps, _SSR_Thickness, resolution, 
-        rayStart, rayDir, _SSR_PyramidDepth);
-	
-    // float3 sceneColor = _SSR_SceneColor_RT.SampleLevel(sampler_linear_clamp, RayHitData.xy, 0).rgb;
-    // _SSR_Out_UVWPdf[id.xy] = float4(RayHitData.xy, 0.0, 1.0);
-    // _SSR_Out_UVWPdf[id.xy] = float4(sceneColor, 1.0);
-    // _SSR_Out_UVWPdf[id.xy] = float4(RayHitData);
-    // _SSR_Out_UVWPdf[id.xy] = float4(hash, 0.0, 1.0);
-    _SSR_Out_UVWPdf[id.xy] = half4(RayHitData.xyz, H.a);
-    float mask = RayHitData.a * GetScreenFadeBord(RayHitData.xy, _SSR_ScreenFade);
-	_SSR_Out_ColorMask[id.xy] = mask * mask;
+        _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
+        _Hiz_RaySteps, _SSR_Thickness, resolution,
+        rayStart, rayDir, _SSR_PyramidDepth_RT);
+    
+    float3 sceneColor = _SSR_SceneColor_RT.SampleLevel(sampler_point_clamp, RayHitData.xy, 0).rgb;
+    // sceneColor = rcp(1 + Luminance(sceneColor));
 
+    _SSR_Out_UVWPdf[id.xy] = float4(RayHitData.xyz, H.a);
+    float mask = RayHitData.a * GetScreenFadeBord(RayHitData.xy, _SSR_ScreenFade);
+    _SSR_Out_ColorMask[id.xy] = float4(sceneColor, saturate(mask * mask));
+}
+
+static const int2 kStackowiakSampleSet4[15] = {
+    int2(0, 1), int2(-2, 1), int2(2, -3), int2(-3, 0), int2(1, 2), int2(-1, -2), int2(3, 0), int2(-3, 3), int2(0, -3), int2(-1, -1), int2(2, 1), int2(-2, -2), int2(1, 0), int2(0, 2), int2(3, -1)
+};
+
+#pragma kernel SSR_SpatialFilter
+#define SSR_SPETIAL_COUNT 15
+
+Texture2D _SSR_UVWPdf;
+Texture2D _SSR_ColorMask;
+
+RWTexture2D<float4> _SSR_Out_SpatialFilter;
+
+[numthreads(8, 8, 1)]
+void SSR_SpatialFilter(uint3 id : SV_DispatchThreadID)
+{
+    float2 resolution = _SSR_BufferSize.xy;
+    float2 invResolution = _SSR_BufferSize.zw;
+    float2 uv = (id.xy + 0.5) * invResolution;
+
+    uint2 pixelPosition = uint2(uv * resolution);
+
+    float depth = _CameraDepthTexture.SampleLevel(sampler_bilinear_clamp, uv, 0.0f).r;
+    if (depth <= 1e-7)
+    {
+        _SSR_Out_SpatialFilter[id.xy] = 0;
+        return;
+    }
+    float3 worldNormal = _GBuffer2.SampleLevel(sampler_bilinear_clamp, uv, 0).xyz;
+
+    uint2 random = Rand3DPCG16(uint3(id.xy + 0.5, _SSR_FrameIndex)).xy;
+    float sumWeight;
+    float4 spatialColor;
+
+    [loop]
+    for (int i = 0; i < SSR_SPETIAL_COUNT; ++i)
+    {
+        float2 offsetUV = uv + (kStackowiakSampleSet4[i] * invResolution);
+
+        half pdf = _SSR_UVWPdf.SampleLevel(sampler_bilinear_clamp, offsetUV, 0).a;
+
+        float offsetDepth = _CameraDepthTexture.SampleLevel(sampler_bilinear_clamp, offsetUV, 0).r;
+        float3 offsetNormal = _GBuffer2.SampleLevel(sampler_bilinear_clamp, offsetUV, 0).xyz;
+
+        float4 hitColorMask = _SSR_ColorMask.SampleLevel(sampler_bilinear_clamp, offsetUV, 0);
+        
+        float depthWeight = GetEdgeStopDepthWeight(depth, offsetDepth, 0.001);
+        float normalWeight = GetEdgeStoppNormalWeight(worldNormal, offsetNormal, 64);
+        float weight = depthWeight * normalWeight;
+        sumWeight += weight;
+        spatialColor += float4(hitColorMask.rgb * weight, hitColorMask.a);
+    }
+    spatialColor /= max(sumWeight, 0.00001);
+    _SSR_Out_SpatialFilter[id.xy] = spatialColor;
+}
+
+
+#pragma kernel SSR_Combine
+
+Texture2D<float4> _SSR_FinalColor;
+
+RWTexture2D<float4> _SSR_Out_Combine;
+
+
+[numthreads(8, 8, 1)]
+void SSR_Combine(uint3 id : SV_DispatchThreadID)
+{
+    float2 resolution = _SSR_BufferSize.xy;
+    float2 invResolution = _SSR_BufferSize.zw;
+    float2 uv = (id.xy + 0.5) * invResolution;
+
+    float depth = _CameraDepthTexture.SampleLevel(sampler_point_clamp, uv, 0).r;
+
+    float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_point_clamp, uv, 0);
+    half metallic = _GBuffer1.SampleLevel(sampler_point_clamp, uv, 0).r;
+    half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
+
+    float3 worldNormal = UnpackNormal(gbuffer2.xyz);
+    float3 worldPos = ComputeWorldSpacePosition(uv, depth, _SSR_InvViewProjMatrix);
+    float3 viewDir = normalize(worldPos - GetCameraPositionWS());
+
+    float2 sampleUV = _SSR_UVWPdf.SampleLevel(sampler_point_clamp, uv, 0).xy;
+    float mask = _SSR_ColorMask.SampleLevel(sampler_point_clamp, uv, 0).a;
+
+    float4 sceneColor = _SSR_SceneColor_RT.SampleLevel(sampler_point_clamp, uv, 0);
+    float4 sampleColor = _SSR_FinalColor.SampleLevel(sampler_point_clamp, uv, 0);
+
+    half NoV = saturate(dot(worldNormal, -viewDir));
+    float fres = F_Schlick(0.1f, NoV);
+
+    float4 reflectionColor = lerp(sampleColor, 0, saturate(roughness - 0.05)) * fres;
+    reflectionColor = saturate(lerp(0, reflectionColor, mask));
+
+    _SSR_Out_Combine[id.xy] = sceneColor + reflectionColor;
 }

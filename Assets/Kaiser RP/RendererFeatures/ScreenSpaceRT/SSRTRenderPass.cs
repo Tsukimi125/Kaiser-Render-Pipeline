@@ -8,19 +8,29 @@ public class SSRTRenderPass : ScriptableRenderPass
 {
     private SSRTSettings settings; //基本参数
     private Material material; //材质
+    private int frameIndex;
 
-    int pyramidDepth_ID = Shader.PropertyToID("_PyramidDepth");
-
-    private static class SSR_InputIDs 
+    private static class SSR_InputIDs
     {
         public static int SceneColor = Shader.PropertyToID("_SSR_SceneColor_RT");
-
+        public static int PyramidDepth = Shader.PropertyToID("_PyramidDepth");
     }
 
     private static class SSR_OutputIDs
     {
         public static int UVWPdf = Shader.PropertyToID("_SSR_Out_UVWPdf");
         public static int ColorMask = Shader.PropertyToID("_SSR_Out_ColorMask");
+        public static int SpatialFilter = Shader.PropertyToID("_SSR_Out_SpatialFilter");
+        public static int TemporalFilter = Shader.PropertyToID("_SSR_Out_TemporalFilter");
+        public static int Combine = Shader.PropertyToID("_SSR_Out_Combine");
+    }
+
+    private static class SSR_Matrix
+    {
+        public static Matrix4x4 Proj;
+        public static Matrix4x4 InvView;
+        public static Matrix4x4 InvProj;
+        public static Matrix4x4 InvViewProj;
     }
 
     public SSRTRenderPass(SSRTSettings settings)
@@ -47,82 +57,126 @@ public class SSRTRenderPass : ScriptableRenderPass
             material = CoreUtils.CreateEngineMaterial(settings.shader);
         }
     }
+    void UpdateCurrentFrameIndex()
+    {
+        frameIndex = (frameIndex + 1) % 8;
+    }
+
+    void UpdataTransformMatrix(Camera camera)
+    {
+        SSR_Matrix.Proj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false);
+        SSR_Matrix.InvView = camera.cameraToWorldMatrix;
+        SSR_Matrix.InvProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
+        SSR_Matrix.InvViewProj = camera.cameraToWorldMatrix *
+            GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
+    }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
+        UpdateCurrentFrameIndex();
+
         var cmd = CommandBufferPool.Get();
 
         using (new ProfilingScope(cmd, profilingSampler))
         {
-            cmd.BeginSample("Ray Tracing");
-            {
-                
-            }
             // Prepare
             int width = renderingData.cameraData.cameraTargetDescriptor.width;
             int height = renderingData.cameraData.cameraTargetDescriptor.height;
-
-            Matrix4x4 projMatrix = GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, false);
-            Matrix4x4 invProjMatrix = GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, false).inverse;
-            Matrix4x4 invViewMatrix = renderingData.cameraData.camera.cameraToWorldMatrix;
-            Matrix4x4 invViewProjMatrix = renderingData.cameraData.camera.cameraToWorldMatrix * 
-                GL.GetGPUProjectionMatrix(renderingData.cameraData.camera.projectionMatrix, false).inverse;
-
-            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjMatrix", projMatrix);
-            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewMatrix", invViewMatrix);
-            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvProjMatrix", invProjMatrix);
-            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewProjMatrix", invViewProjMatrix);
-
-            RenderTextureDescriptor descriptor0 = new RenderTextureDescriptor(
-                width, height, RenderTextureFormat.Default, 0, 0);
-            descriptor0.sRGB = false;
-            descriptor0.enableRandomWrite = true;
-            RenderTextureDescriptor descriptor1 = new RenderTextureDescriptor(
-                width, height, RenderTextureFormat.Default, 0, 0);
-            descriptor1.sRGB = false;
-            descriptor1.enableRandomWrite = true;
-            RenderTextureDescriptor descriptorMask = new RenderTextureDescriptor(
-                width, height, RenderTextureFormat.R8, 0, 0);
-            descriptorMask.sRGB = false;
-            descriptorMask.enableRandomWrite = true;
-
-            cmd.SetComputeVectorParam(settings.computeShader, "_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
+            UpdataTransformMatrix(renderingData.cameraData.camera);
 
             int k1 = settings.computeShader.FindKernel("SSR_RayTracing");
-            
-            // Init Input
-            cmd.GetTemporaryRT(SSR_InputIDs.SceneColor, descriptor0);
-            cmd.Blit(Shader.GetGlobalTexture("_BlitTexture"), SSR_InputIDs.SceneColor);
-            
-            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjMatrix", projMatrix);
-            cmd.SetComputeMatrixParam(settings.computeShader, " ", invViewMatrix);
-            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvProjMatrix", invProjMatrix);
-            cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewProjMatrix", invViewProjMatrix);
+            int k2 = settings.computeShader.FindKernel("SSR_SpatialFilter");
+            int k4 = settings.computeShader.FindKernel("SSR_Combine");
 
-            cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_SceneColor_RT", SSR_InputIDs.SceneColor);
-            cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_PyramidDepth", pyramidDepth_ID);  
+            RenderTextureDescriptor descriptorDefault = new RenderTextureDescriptor(
+                    width, height, RenderTextureFormat.Default, 0, 0);
+            descriptorDefault.sRGB = false;
+            descriptorDefault.enableRandomWrite = true;
 
-            // Init Output
-            cmd.GetTemporaryRT(SSR_OutputIDs.UVWPdf, descriptor1);
-            cmd.GetTemporaryRT(SSR_OutputIDs.ColorMask, descriptorMask);
-            cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_UVWPdf", SSR_OutputIDs.UVWPdf);
-            cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_ColorMask", SSR_OutputIDs.ColorMask);
+            RenderTextureDescriptor descriptorDefault2 = new RenderTextureDescriptor(
+                    width, height, RenderTextureFormat.Default, 0, 0);
+            descriptorDefault2.sRGB = false;
+            descriptorDefault2.enableRandomWrite = true;
 
-            // Init Hiz Trace Settings
-            cmd.SetComputeIntParam(settings.computeShader, "_Hiz_MaxLevel", settings.Hiz_MaxLevel);
-            cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StartLevel", settings.Hiz_StartLevel);
-            cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StopLevel", settings.Hiz_StopLevel);
-            cmd.SetComputeIntParam(settings.computeShader, "_Hiz_RaySteps", settings.Hiz_RaySteps);
-            cmd.SetComputeFloatParam(settings.computeShader, "_SSR_Thickness", settings.SSR_Thickness);
-            cmd.SetComputeFloatParam(settings.computeShader, "_SSR_ScreenFade", settings.SSR_ScreenFade);
+            RenderTextureDescriptor descriptorR8 = new RenderTextureDescriptor(
+                width, height, RenderTextureFormat.R8, 0, 0);
+            descriptorR8.sRGB = false;
+            descriptorR8.enableRandomWrite = true;
 
-            cmd.DispatchCompute(settings.computeShader, k1, width / 8, height / 8, 1);
+            cmd.BeginSample("Ray Tracing");
+            {
+                // Init Common Settings
+                cmd.SetComputeVectorParam(settings.computeShader, "_SSR_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
+                cmd.SetComputeIntParam(settings.computeShader, "_SSR_FrameIndex", frameIndex);
+                cmd.SetComputeFloatParam(settings.computeShader, "_SSR_Thickness", settings.SSR_Thickness);
+                cmd.SetComputeFloatParam(settings.computeShader, "_SSR_ScreenFade", settings.SSR_ScreenFade);
 
- 
+                // Init Matrix
+                cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjMatrix", SSR_Matrix.Proj);
+                cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewMatrix", SSR_Matrix.InvView);
+                cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvProjMatrix", SSR_Matrix.InvProj);
+                cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewProjMatrix", SSR_Matrix.InvViewProj);
+
+                // Init Hiz Trace Settings
+                cmd.SetComputeIntParam(settings.computeShader, "_Hiz_MaxLevel", settings.Hiz_MaxLevel);
+                cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StartLevel", settings.Hiz_StartLevel);
+                cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StopLevel", settings.Hiz_StopLevel);
+                cmd.SetComputeIntParam(settings.computeShader, "_Hiz_RaySteps", settings.Hiz_RaySteps);
+
+                // Init Input Texture
+                cmd.GetTemporaryRT(SSR_InputIDs.SceneColor, descriptorDefault);
+                cmd.Blit(Shader.GetGlobalTexture("_BlitTexture"), SSR_InputIDs.SceneColor);
+                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_SceneColor_RT", SSR_InputIDs.SceneColor);
+                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_PyramidDepth_RT", SSR_InputIDs.PyramidDepth);
+
+                // Init Output Texture
+                cmd.GetTemporaryRT(SSR_OutputIDs.UVWPdf, descriptorDefault);
+                cmd.GetTemporaryRT(SSR_OutputIDs.ColorMask, descriptorDefault);
+                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_UVWPdf", SSR_OutputIDs.UVWPdf);
+                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_ColorMask", SSR_OutputIDs.ColorMask);
+
+                // Dispatch
+                cmd.DispatchCompute(settings.computeShader, k1, width / 8, height / 8, 1);
+
+                // Release
+                // cmd.ReleaseTemporaryRT(SSR_InputIDs.SceneColor);
+            }
+            cmd.EndSample("Ray Tracing");
+
+            cmd.BeginSample("Spatial Filter");
+            {
+                cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_UVWPdf", SSR_OutputIDs.UVWPdf);
+                cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_ColorMask", SSR_OutputIDs.ColorMask);
+
+                cmd.GetTemporaryRT(SSR_OutputIDs.SpatialFilter, descriptorDefault);
+                cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_Out_SpatialFilter", SSR_OutputIDs.SpatialFilter);
+                cmd.DispatchCompute(settings.computeShader, k2, width / 8, height / 8, 1);
+            }
+            cmd.EndSample("Spatial Filter");
+
+            cmd.BeginSample("Temporal Filter");
+            {
+
+            }
+            cmd.EndSample("Temporal Filter");
+
+            cmd.BeginSample("Combine");
+            {
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_SceneColor_RT", SSR_InputIDs.SceneColor);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_UVWPdf", SSR_OutputIDs.UVWPdf);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_ColorMask", SSR_OutputIDs.ColorMask);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_FinalColor", SSR_OutputIDs.SpatialFilter);
+
+                cmd.GetTemporaryRT(SSR_OutputIDs.Combine, descriptorDefault2);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_Out_Combine", SSR_OutputIDs.Combine);
+                cmd.DispatchCompute(settings.computeShader, k4, width / 8, height / 8, 1);
+            }
+            cmd.EndSample("Combine");
+
+            cmd.Blit(SSR_OutputIDs.Combine, renderingData.cameraData.renderer.cameraColorTargetHandle);
+
             cmd.ReleaseTemporaryRT(SSR_OutputIDs.UVWPdf);
             cmd.ReleaseTemporaryRT(SSR_OutputIDs.ColorMask);
-
-            cmd.EndSample("Ray Tracing");
         }
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);

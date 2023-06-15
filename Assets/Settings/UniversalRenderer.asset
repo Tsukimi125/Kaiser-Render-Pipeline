@@ -37,10 +37,14 @@ MonoBehaviour:
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
     noiseTex: {fileID: 0}
     SSR_Thickness: 0.188
+    SSR_ScreenFade: 0.1
     Hiz_MaxLevel: 10
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
     Hiz_RaySteps: 64
+    Spatial_Resolve: 9
+    Temporal_Weight: 0.98
+    Temporal_Scale: 1.25
     debugMode: 0
 --- !u!114 &11400000
 MonoBehaviour:
