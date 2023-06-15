@@ -201,7 +201,7 @@ void SSR_Combine(uint3 id : SV_DispatchThreadID)
     float fres = F_Schlick(0.1f, NoV);
 
     float4 reflectionColor = lerp(sampleColor, 0, saturate(roughness - 0.25)) * fres;
-    // reflectionColor = saturate(lerp(0, reflectionColor, mask));
+    reflectionColor = saturate(lerp(0, reflectionColor, mask));
 
     _SSR_Out_Combine[id.xy] = sceneColor + reflectionColor;
     // _SSR_Out_Combine[id.xy] = float4(sceneColor.rgb + reflectionColor.rgb, 1.0);
