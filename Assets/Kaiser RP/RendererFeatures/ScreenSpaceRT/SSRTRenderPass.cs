@@ -28,9 +28,10 @@ public class SSRTRenderPass : ScriptableRenderPass
     private static class SSR_Matrix
     {
         public static Matrix4x4 Proj;
-        public static Matrix4x4 InvView;
         public static Matrix4x4 InvProj;
         public static Matrix4x4 InvViewProj;
+        public static Matrix4x4 viewProj;
+        public static Matrix4x4 prevViewProj;
     }
 
     public SSRTRenderPass(SSRTSettings settings)
@@ -62,31 +63,40 @@ public class SSRTRenderPass : ScriptableRenderPass
         frameIndex = (frameIndex + 1) % 8;
     }
 
-    void UpdataTransformMatrix(Camera camera)
+    void UpdateTransformMatrix(Camera camera)
     {
         SSR_Matrix.Proj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false);
-        SSR_Matrix.InvView = camera.cameraToWorldMatrix;
         SSR_Matrix.InvProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
         SSR_Matrix.InvViewProj = camera.cameraToWorldMatrix *
             GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
+        SSR_Matrix.viewProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
     }
 
+    void UpdatePreviousTransformMatrix(Camera camera)
+    {
+        SSR_Matrix.prevViewProj = camera.cameraToWorldMatrix *
+            GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
+    }
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
         UpdateCurrentFrameIndex();
 
         var cmd = CommandBufferPool.Get();
 
+        int k1 = settings.computeShader.FindKernel("SSR_RayTracing");
+        int k2 = settings.computeShader.FindKernel("SSR_SpatialFilter");
+        int k4 = settings.computeShader.FindKernel("SSR_Combine");
+
         using (new ProfilingScope(cmd, profilingSampler))
         {
+            UpdateTransformMatrix(renderingData.cameraData.camera);
+
             // Prepare
             int width = renderingData.cameraData.cameraTargetDescriptor.width;
             int height = renderingData.cameraData.cameraTargetDescriptor.height;
-            UpdataTransformMatrix(renderingData.cameraData.camera);
 
-            int k1 = settings.computeShader.FindKernel("SSR_RayTracing");
-            int k2 = settings.computeShader.FindKernel("SSR_SpatialFilter");
-            int k4 = settings.computeShader.FindKernel("SSR_Combine");
+
+
 
             RenderTextureDescriptor descriptorDefault = new RenderTextureDescriptor(
                     width, height, RenderTextureFormat.Default, 0, 0);
@@ -113,7 +123,6 @@ public class SSRTRenderPass : ScriptableRenderPass
 
                 // Init Matrix
                 cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjMatrix", SSR_Matrix.Proj);
-                cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewMatrix", SSR_Matrix.InvView);
                 cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvProjMatrix", SSR_Matrix.InvProj);
                 cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewProjMatrix", SSR_Matrix.InvViewProj);
 
@@ -167,7 +176,7 @@ public class SSRTRenderPass : ScriptableRenderPass
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_ColorMask", SSR_OutputIDs.ColorMask);
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_FinalColor", SSR_OutputIDs.SpatialFilter);
 
-                cmd.GetTemporaryRT(SSR_OutputIDs.Combine, descriptorDefault2);
+                cmd.GetTemporaryRT(SSR_OutputIDs.Combine, descriptorDefault);
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_Out_Combine", SSR_OutputIDs.Combine);
                 cmd.DispatchCompute(settings.computeShader, k4, width / 8, height / 8, 1);
             }
@@ -178,6 +187,9 @@ public class SSRTRenderPass : ScriptableRenderPass
             cmd.ReleaseTemporaryRT(SSR_OutputIDs.UVWPdf);
             cmd.ReleaseTemporaryRT(SSR_OutputIDs.ColorMask);
         }
+
+        UpdatePreviousTransformMatrix(renderingData.cameraData.camera);
+
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);
     }

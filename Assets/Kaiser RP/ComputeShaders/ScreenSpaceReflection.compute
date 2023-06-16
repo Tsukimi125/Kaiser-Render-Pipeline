@@ -1,6 +1,5 @@
 #pragma kernel SSR_RayTracing
 
-
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
@@ -14,7 +13,6 @@
 // #include "../ShaderLibrary/SSRT.hlsl"
 
 #define BRDF_BIAS 0.7f
-
 
 RWTexture2D<float4> _SSR_Out_UVWPdf;
 RWTexture2D<float4> _SSR_Out_ColorMask;
@@ -36,7 +34,6 @@ SAMPLER(sampler_bilinear_clamp);
 float4 _SSR_BufferSize;
 
 float4x4 _SSR_ProjMatrix;
-float4x4 _SSR_InvViewMatrix;
 float4x4 _SSR_InvProjMatrix;
 float4x4 _SSR_InvViewProjMatrix;
 
