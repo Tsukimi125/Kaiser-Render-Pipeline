@@ -164,6 +164,19 @@ void SSR_SpatialFilter(uint3 id : SV_DispatchThreadID)
 }
 
 
+#pragma kernel SSR_TemporalFilter
+
+Texture2D _SSR_SpatialFilter;
+Texture2D _SSR_Temporal_PrevTexture;
+Texture2D _SSR_Temporal_CurrTexture;
+RWTexture2D<float4> _SSR_TemporalFilter;
+
+void SSR_TemporalFilter(uint3 id : SV_DispatchThreadID)
+{
+
+}
+
+
 #pragma kernel SSR_Combine
 
 Texture2D<float4> _SSR_FinalColor;

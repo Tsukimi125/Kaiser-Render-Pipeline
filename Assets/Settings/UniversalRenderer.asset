@@ -30,21 +30,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6fc7468e3425a6d4bbca3ad5e81b82f1, type: 3}
   m_Name: SSRT
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     passEvent: 550
     shader: {fileID: 4800000, guid: b7fd1199a758b0d439cb5c1002b0850b, type: 3}
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
     noiseTex: {fileID: 0}
     SSR_Thickness: 0.1
-    SSR_ScreenFade: 0.05
+    SSR_ScreenFade: 0
     Hiz_MaxLevel: 6
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
     Hiz_RaySteps: 64
     Spatial_Resolve: 9
-    Temporal_Weight: 0.98
-    Temporal_Scale: 1.25
+    Temporal_Weight: 0.99
+    Temporal_Scale: 1.77
     debugMode: 0
 --- !u!114 &11400000
 MonoBehaviour:

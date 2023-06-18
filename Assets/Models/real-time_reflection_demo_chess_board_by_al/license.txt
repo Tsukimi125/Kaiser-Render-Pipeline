@@ -1,0 +1,11 @@
+Model Information:
+* title:	Real-time reflection demo: Chess Board by /Al
+* source:	https://sketchfab.com/3d-models/real-time-reflection-demo-chess-board-by-al-6cb7046c56ed45748fbaf5a63444a260
+* author:	Sketchfab (https://sketchfab.com/Sketchfab)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Real-time reflection demo: Chess Board by /Al" (https://sketchfab.com/3d-models/real-time-reflection-demo-chess-board-by-al-6cb7046c56ed45748fbaf5a63444a260) by Sketchfab (https://sketchfab.com/Sketchfab) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

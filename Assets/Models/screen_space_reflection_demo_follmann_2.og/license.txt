@@ -1,0 +1,11 @@
+Model Information:
+* title:	Screen Space Reflection Demo: Follmann 2.OG
+* source:	https://sketchfab.com/3d-models/screen-space-reflection-demo-follmann-2og-6164eed28c464c94be8f5268240dc864
+* author:	Sketchfab (https://sketchfab.com/Sketchfab)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Screen Space Reflection Demo: Follmann 2.OG" (https://sketchfab.com/3d-models/screen-space-reflection-demo-follmann-2og-6164eed28c464c94be8f5268240dc864) by Sketchfab (https://sketchfab.com/Sketchfab) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

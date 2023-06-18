@@ -21,7 +21,8 @@ public class SSRTRenderPass : ScriptableRenderPass
         public static int UVWPdf = Shader.PropertyToID("_SSR_Out_UVWPdf");
         public static int ColorMask = Shader.PropertyToID("_SSR_Out_ColorMask");
         public static int SpatialFilter = Shader.PropertyToID("_SSR_Out_SpatialFilter");
-        public static int TemporalFilter = Shader.PropertyToID("_SSR_Out_TemporalFilter");
+        public static int TemporalPrevTexture = Shader.PropertyToID("_SSR_Temporal_PrevTexture");
+        public static int TemporalCurrTexture = Shader.PropertyToID("_SSR_Temporal_CurrTexture");
         public static int Combine = Shader.PropertyToID("_SSR_Out_Combine");
     }
 
@@ -77,6 +78,27 @@ public class SSRTRenderPass : ScriptableRenderPass
         SSR_Matrix.prevViewProj = camera.cameraToWorldMatrix *
             GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
     }
+
+    void UpdateRenderTextures(CommandBuffer cmd, int width, int height)
+    {
+        RenderTextureDescriptor descriptorDefault = new RenderTextureDescriptor(
+                    width, height, RenderTextureFormat.Default, 0, 0);
+        descriptorDefault.sRGB = false;
+        descriptorDefault.enableRandomWrite = true;
+
+        RenderTextureDescriptor descriptorR8 = new RenderTextureDescriptor(
+                width, height, RenderTextureFormat.R8, 0, 0);
+        descriptorR8.sRGB = false;
+        descriptorR8.enableRandomWrite = true;
+
+        cmd.GetTemporaryRT(SSR_InputIDs.SceneColor, descriptorDefault);
+        cmd.GetTemporaryRT(SSR_OutputIDs.UVWPdf, descriptorDefault);
+        cmd.GetTemporaryRT(SSR_OutputIDs.ColorMask, descriptorDefault);
+        cmd.GetTemporaryRT(SSR_OutputIDs.SpatialFilter, descriptorDefault);
+        cmd.GetTemporaryRT(SSR_OutputIDs.Combine, descriptorDefault);
+
+    }
+
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
         UpdateCurrentFrameIndex();
@@ -95,23 +117,11 @@ public class SSRTRenderPass : ScriptableRenderPass
             int width = renderingData.cameraData.cameraTargetDescriptor.width;
             int height = renderingData.cameraData.cameraTargetDescriptor.height;
 
-
-
-
-            RenderTextureDescriptor descriptorDefault = new RenderTextureDescriptor(
-                    width, height, RenderTextureFormat.Default, 0, 0);
-            descriptorDefault.sRGB = false;
-            descriptorDefault.enableRandomWrite = true;
-
-            RenderTextureDescriptor descriptorDefault2 = new RenderTextureDescriptor(
-                    width, height, RenderTextureFormat.Default, 0, 0);
-            descriptorDefault2.sRGB = false;
-            descriptorDefault2.enableRandomWrite = true;
-
-            RenderTextureDescriptor descriptorR8 = new RenderTextureDescriptor(
-                width, height, RenderTextureFormat.R8, 0, 0);
-            descriptorR8.sRGB = false;
-            descriptorR8.enableRandomWrite = true;
+            #region Update RenderTextures
+            {
+                UpdateRenderTextures(cmd, width, height);
+            }
+            #endregion
 
             cmd.BeginSample("Ray Tracing");
             {
@@ -133,14 +143,12 @@ public class SSRTRenderPass : ScriptableRenderPass
                 cmd.SetComputeIntParam(settings.computeShader, "_Hiz_RaySteps", settings.Hiz_RaySteps);
 
                 // Init Input Texture
-                cmd.GetTemporaryRT(SSR_InputIDs.SceneColor, descriptorDefault);
+
                 cmd.Blit(Shader.GetGlobalTexture("_BlitTexture"), SSR_InputIDs.SceneColor);
                 cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_SceneColor_RT", SSR_InputIDs.SceneColor);
                 cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_PyramidDepth_RT", SSR_InputIDs.PyramidDepth);
 
                 // Init Output Texture
-                cmd.GetTemporaryRT(SSR_OutputIDs.UVWPdf, descriptorDefault);
-                cmd.GetTemporaryRT(SSR_OutputIDs.ColorMask, descriptorDefault);
                 cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_UVWPdf", SSR_OutputIDs.UVWPdf);
                 cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_ColorMask", SSR_OutputIDs.ColorMask);
 
@@ -157,7 +165,7 @@ public class SSRTRenderPass : ScriptableRenderPass
                 cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_UVWPdf", SSR_OutputIDs.UVWPdf);
                 cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_ColorMask", SSR_OutputIDs.ColorMask);
 
-                cmd.GetTemporaryRT(SSR_OutputIDs.SpatialFilter, descriptorDefault);
+
                 cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_Out_SpatialFilter", SSR_OutputIDs.SpatialFilter);
                 cmd.DispatchCompute(settings.computeShader, k2, width / 8, height / 8, 1);
             }
@@ -165,6 +173,10 @@ public class SSRTRenderPass : ScriptableRenderPass
 
             cmd.BeginSample("Temporal Filter");
             {
+                cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_Temporal_PrevTexture", SSR_OutputIDs.TemporalPrevTexture); // TODO:
+                cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_Temporal_CurrTexture", SSR_OutputIDs.SpatialFilter);
+
+
 
             }
             cmd.EndSample("Temporal Filter");
@@ -176,7 +188,7 @@ public class SSRTRenderPass : ScriptableRenderPass
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_ColorMask", SSR_OutputIDs.ColorMask);
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_FinalColor", SSR_OutputIDs.SpatialFilter);
 
-                cmd.GetTemporaryRT(SSR_OutputIDs.Combine, descriptorDefault);
+
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_Out_Combine", SSR_OutputIDs.Combine);
                 cmd.DispatchCompute(settings.computeShader, k4, width / 8, height / 8, 1);
             }
