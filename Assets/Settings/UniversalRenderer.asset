@@ -30,7 +30,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6fc7468e3425a6d4bbca3ad5e81b82f1, type: 3}
   m_Name: SSRT
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   settings:
     passEvent: 550
     shader: {fileID: 4800000, guid: b7fd1199a758b0d439cb5c1002b0850b, type: 3}

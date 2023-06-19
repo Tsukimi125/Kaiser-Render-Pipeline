@@ -202,18 +202,23 @@ void SSR_Combine(uint3 id : SV_DispatchThreadID)
     float3 viewDir = normalize(worldPos - GetCameraPositionWS());
 
     float2 sampleUV = _SSR_UVWPdf.SampleLevel(sampler_point_clamp, uv, 0).xy;
-    float mask = _SSR_ColorMask.SampleLevel(sampler_point_clamp, uv, 0).a;
+    float SSRMask = _SSR_ColorMask.SampleLevel(sampler_point_clamp, uv, 0).a;
 
     float4 sceneColor = _SSR_SceneColor_RT.SampleLevel(sampler_point_clamp, uv, 0);
     float4 sampleColor = _SSR_FinalColor.SampleLevel(sampler_point_clamp, uv, 0);
 
     half NoV = saturate(dot(worldNormal, -viewDir));
-    float fres = F_Schlick(0.1f, NoV);
+    float fres = F_Schlick(metallic, NoV);
+
+    // half4 PreintegratedGF = half4(PreintegratedDGF_LUT(_SSR_PreintegratedGF_LUT, EnergyCompensation, SpecularColor.rgb, Roughness, NoV).rgb, 1);
+
+    // float4 reflectionColor = lerp(sampleColor, 0, saturate(roughness - 0.25)) * fres;
+    // reflectionColor = saturate(lerp(0, reflectionColor, SSRMask));
 
     float4 reflectionColor = lerp(sampleColor, 0, saturate(roughness - 0.25)) * fres;
-    reflectionColor = saturate(lerp(0, reflectionColor, mask));
 
-    _SSR_Out_Combine[id.xy] = sceneColor + reflectionColor;
+    // _SSR_Out_Combine[id.xy] = lerp(sceneColor, reflectionColor, SSRMask * fres);
+    _SSR_Out_Combine[id.xy] = SSRMask * roughness;
     // _SSR_Out_Combine[id.xy] = float4(sceneColor.rgb + reflectionColor.rgb, 1.0);
 
 }
