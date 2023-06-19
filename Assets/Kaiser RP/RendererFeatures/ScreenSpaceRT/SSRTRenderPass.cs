@@ -8,7 +8,7 @@ public class SSRTRenderPass : ScriptableRenderPass
 {
     private SSRTSettings settings; //基本参数
     private Material material; //材质
-    private int frameIndex;
+
 
     private static class SSR_InputIDs
     {
@@ -21,6 +21,7 @@ public class SSRTRenderPass : ScriptableRenderPass
         public static int UVWPdf = Shader.PropertyToID("_SSR_Out_UVWPdf");
         public static int ColorMask = Shader.PropertyToID("_SSR_Out_ColorMask");
         public static int SpatialFilter = Shader.PropertyToID("_SSR_Out_SpatialFilter");
+        public static int TemporalFilter = Shader.PropertyToID("_SSR_Out_TemporalFilter");
         public static int TemporalPrevTexture = Shader.PropertyToID("_SSR_Temporal_PrevTexture");
         public static int TemporalCurrTexture = Shader.PropertyToID("_SSR_Temporal_CurrTexture");
         public static int Combine = Shader.PropertyToID("_SSR_Out_Combine");
@@ -31,8 +32,8 @@ public class SSRTRenderPass : ScriptableRenderPass
         public static Matrix4x4 Proj;
         public static Matrix4x4 InvProj;
         public static Matrix4x4 InvViewProj;
-        public static Matrix4x4 viewProj;
-        public static Matrix4x4 prevViewProj;
+        public static Matrix4x4 ViewProj;
+        public static Matrix4x4 PrevViewProj;
     }
 
     public SSRTRenderPass(SSRTSettings settings)
@@ -59,10 +60,32 @@ public class SSRTRenderPass : ScriptableRenderPass
             material = CoreUtils.CreateEngineMaterial(settings.shader);
         }
     }
-    void UpdateCurrentFrameIndex()
+
+
+    private int frameIndex = 0;
+    private const int sampleCount = 64;
+    private Vector2 randomSampler = new Vector2(1.0f, 1.0f);
+    private float GetHaltonValue(int index, int radix)
     {
-        frameIndex = (frameIndex + 1) % 8;
+        float result = 0f;
+        float fraction = 1f / radix;
+
+        while (index > 0)
+        {
+            result += (index % radix) * fraction;
+            index /= radix;
+            fraction /= radix;
+        }
+        return result;
     }
+    private Vector2 GenerateRandomOffset()
+    {
+        var offset = new Vector2(GetHaltonValue(frameIndex & 1023, 2), GetHaltonValue(frameIndex & 1023, 3));
+        if (frameIndex++ >= sampleCount)
+            frameIndex = 0;
+        return offset;
+    }
+
 
     void UpdateTransformMatrix(Camera camera)
     {
@@ -70,12 +93,12 @@ public class SSRTRenderPass : ScriptableRenderPass
         SSR_Matrix.InvProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
         SSR_Matrix.InvViewProj = camera.cameraToWorldMatrix *
             GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
-        SSR_Matrix.viewProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
+        SSR_Matrix.ViewProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
     }
 
     void UpdatePreviousTransformMatrix(Camera camera)
     {
-        SSR_Matrix.prevViewProj = camera.cameraToWorldMatrix *
+        SSR_Matrix.PrevViewProj = camera.cameraToWorldMatrix *
             GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
     }
 
@@ -95,18 +118,24 @@ public class SSRTRenderPass : ScriptableRenderPass
         cmd.GetTemporaryRT(SSR_OutputIDs.UVWPdf, descriptorDefault);
         cmd.GetTemporaryRT(SSR_OutputIDs.ColorMask, descriptorDefault);
         cmd.GetTemporaryRT(SSR_OutputIDs.SpatialFilter, descriptorDefault);
+
+        cmd.GetTemporaryRT(SSR_OutputIDs.TemporalFilter, descriptorDefault);
+        cmd.GetTemporaryRT(SSR_OutputIDs.TemporalPrevTexture, descriptorDefault);
+        cmd.GetTemporaryRT(SSR_OutputIDs.TemporalCurrTexture, descriptorDefault);
+
         cmd.GetTemporaryRT(SSR_OutputIDs.Combine, descriptorDefault);
 
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
-        UpdateCurrentFrameIndex();
+        randomSampler = GenerateRandomOffset();
 
         var cmd = CommandBufferPool.Get();
 
         int k1 = settings.computeShader.FindKernel("SSR_RayTracing");
         int k2 = settings.computeShader.FindKernel("SSR_SpatialFilter");
+        int k3 = settings.computeShader.FindKernel("SSR_TemporalFilter");
         int k4 = settings.computeShader.FindKernel("SSR_Combine");
 
         using (new ProfilingScope(cmd, profilingSampler))
@@ -127,14 +156,19 @@ public class SSRTRenderPass : ScriptableRenderPass
             {
                 // Init Common Settings
                 cmd.SetComputeVectorParam(settings.computeShader, "_SSR_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
+                cmd.SetComputeVectorParam(settings.computeShader, "_SSR_Jitter", randomSampler);
                 cmd.SetComputeIntParam(settings.computeShader, "_SSR_FrameIndex", frameIndex);
                 cmd.SetComputeFloatParam(settings.computeShader, "_SSR_Thickness", settings.SSR_Thickness);
                 cmd.SetComputeFloatParam(settings.computeShader, "_SSR_ScreenFade", settings.SSR_ScreenFade);
+                cmd.SetComputeFloatParam(settings.computeShader, "_SSR_TemporalWeight", settings.Temporal_Weight);
+                cmd.SetComputeFloatParam(settings.computeShader, "_SSR_TemporalScale", settings.Temporal_Scale);
 
                 // Init Matrix
                 cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjMatrix", SSR_Matrix.Proj);
                 cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvProjMatrix", SSR_Matrix.InvProj);
                 cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewProjMatrix", SSR_Matrix.InvViewProj);
+                cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ViewProjMatrix", SSR_Matrix.ViewProj);
+                cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_PrevViewProjMatrix", SSR_Matrix.PrevViewProj);
 
                 // Init Hiz Trace Settings
                 cmd.SetComputeIntParam(settings.computeShader, "_Hiz_MaxLevel", settings.Hiz_MaxLevel);
@@ -167,15 +201,23 @@ public class SSRTRenderPass : ScriptableRenderPass
 
 
                 cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_Out_SpatialFilter", SSR_OutputIDs.SpatialFilter);
+
                 cmd.DispatchCompute(settings.computeShader, k2, width / 8, height / 8, 1);
+                cmd.CopyTexture(SSR_OutputIDs.SpatialFilter, SSR_OutputIDs.TemporalCurrTexture);
             }
             cmd.EndSample("Spatial Filter");
 
             cmd.BeginSample("Temporal Filter");
             {
-                cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_Temporal_PrevTexture", SSR_OutputIDs.TemporalPrevTexture); // TODO:
-                cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSR_Temporal_CurrTexture", SSR_OutputIDs.SpatialFilter);
+                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_UVWPdf", SSR_OutputIDs.UVWPdf);
+                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_SpatialFilter", SSR_OutputIDs.TemporalCurrTexture);
+                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_Temporal_PrevTexture", SSR_OutputIDs.TemporalPrevTexture);
+                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_Temporal_CurrTexture", SSR_OutputIDs.TemporalCurrTexture);
 
+                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_Out_TemporalFilter", SSR_OutputIDs.TemporalFilter);
+                cmd.DispatchCompute(settings.computeShader, k3, width / 8, height / 8, 1);
+                cmd.CopyTexture(SSR_OutputIDs.TemporalFilter, SSR_OutputIDs.TemporalCurrTexture);
+                cmd.CopyTexture(SSR_OutputIDs.TemporalCurrTexture, SSR_OutputIDs.TemporalPrevTexture);
 
 
             }
@@ -186,7 +228,7 @@ public class SSRTRenderPass : ScriptableRenderPass
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_SceneColor_RT", SSR_InputIDs.SceneColor);
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_UVWPdf", SSR_OutputIDs.UVWPdf);
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_ColorMask", SSR_OutputIDs.ColorMask);
-                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_FinalColor", SSR_OutputIDs.SpatialFilter);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_FinalColor", SSR_OutputIDs.TemporalCurrTexture);
 
 
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_Out_Combine", SSR_OutputIDs.Combine);

@@ -134,6 +134,9 @@ float GetEdgeStopDepthWeight(float x, float m, float sigma)
 
 
 
+
+
+
 /*********************/
 
 float GetStepScreenFactorToClipAtScreenEdge(float2 RayStartScreen, float2 RayStepScreen)
