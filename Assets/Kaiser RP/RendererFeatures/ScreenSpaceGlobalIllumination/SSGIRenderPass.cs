@@ -25,6 +25,7 @@ public class SSGIRenderPass : ScriptableRenderPass
     private static class SSGI_Output
     {
         public static int ColorMask = Shader.PropertyToID("_SSGI_Out_ColorMask_RT");
+        public static int Combine = Shader.PropertyToID("_SSGI_Out_Combine_RT");
     }
 
 
@@ -113,6 +114,8 @@ public class SSGIRenderPass : ScriptableRenderPass
 
         int k1 = settings.computeShader.FindKernel("SSGI_RayTracing");
 
+        int k3 = settings.computeShader.FindKernel("SSGI_Combine");
+
         int width = renderingData.cameraData.cameraTargetDescriptor.width;
         int height = renderingData.cameraData.cameraTargetDescriptor.height;
 
@@ -129,15 +132,15 @@ public class SSGIRenderPass : ScriptableRenderPass
         descriptorR8.sRGB = false;
         descriptorR8.enableRandomWrite = true;
 
+        cmd.GetTemporaryRT(SSGI_Input.SceneColor, descriptorDefault);
+        cmd.GetTemporaryRT(SSGI_Input.PyramidDepth, descriptorDefault);
+        cmd.GetTemporaryRT(SSGI_Output.ColorMask, descriptorDefault);
+        cmd.GetTemporaryRT(SSGI_Output.Combine, descriptorDefault);
+
         using (new ProfilingScope(cmd, profilingSampler))
         {
             cmd.BeginSample("RayTracing");
             {
-                cmd.GetTemporaryRT(SSGI_Input.SceneColor, descriptorDefault);
-                cmd.GetTemporaryRT(SSGI_Input.PyramidDepth, descriptorDefault);
-                cmd.GetTemporaryRT(SSGI_Output.ColorMask, descriptorDefault);
-
-                cmd.Blit(renderingData.cameraData.renderer.cameraColorTargetHandle, SSGI_Input.SceneColor);
                 cmd.Blit(renderingData.cameraData.renderer.cameraColorTargetHandle, SSGI_Input.SceneColor);
 
                 cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_SceneColor_RT", SSGI_Input.SceneColor);
@@ -145,10 +148,20 @@ public class SSGIRenderPass : ScriptableRenderPass
                 cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_Out_ColorMask_RT", SSGI_Output.ColorMask);
 
                 cmd.DispatchCompute(settings.computeShader, k1, width / 8, height / 8, 1);
-                cmd.Blit(SSGI_Output.ColorMask, renderingData.cameraData.renderer.cameraColorTargetHandle);
             }
 
             cmd.EndSample("RayTracing");
+
+            cmd.BeginSample("Combine");
+            {
+                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSGI_SceneColor_RT", SSGI_Input.SceneColor);
+                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSGI_TraceResult_RT", SSGI_Output.ColorMask);
+                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSGI_Out_Combine_RT", SSGI_Output.Combine);
+
+                cmd.DispatchCompute(settings.computeShader, k3, width / 8, height / 8, 1);
+                cmd.Blit(SSGI_Output.Combine, renderingData.cameraData.renderer.cameraColorTargetHandle);
+            }
+            cmd.EndSample("Combine");
         }
 
         context.ExecuteCommandBuffer(cmd);

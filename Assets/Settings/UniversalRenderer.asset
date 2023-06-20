@@ -38,11 +38,11 @@ MonoBehaviour:
     noiseTex: {fileID: 0}
     SSR_Thickness: 0.075
     SSR_ScreenFade: 0.008
-    Hiz_MaxLevel: 7
+    Hiz_MaxLevel: 6
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
     Hiz_RaySteps: 64
-    Spatial_Resolve: 9
+    Spatial_Resolve: 4
     Temporal_Weight: 0.99
     Temporal_Scale: 1.4
     debugMode: 0
@@ -120,9 +120,10 @@ MonoBehaviour:
     computeShader: {fileID: 7200000, guid: e5e5198e6515ad44ab2f22d43cc2a7bc, type: 3}
     noiseTex: {fileID: 0}
     SSGI_CastRayCount: 1
+    SSGI_Intensity: 1
     SSGI_Thickness: 0.1
     SSGI_ScreenFade: 0.1
-    Hiz_MaxLevel: 7
+    Hiz_MaxLevel: 10
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
     Hiz_RaySteps: 64

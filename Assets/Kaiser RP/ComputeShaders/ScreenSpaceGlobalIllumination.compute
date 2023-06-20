@@ -1,4 +1,5 @@
 #pragma kernel SSGI_RayTracing
+#pragma kernel SSGI_Combine
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
@@ -52,12 +53,10 @@ RWTexture2D<float4> _SSGI_Out_ColorMask_RT;
 [numthreads(8, 8, 1)]
 void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
 {
-    // TODO: insert actual code here!
     float2 resolution = _SSGI_BufferSize.xy;
     float2 invResolution = _SSGI_BufferSize.zw;
     float2 uv = (id.xy + 0.5) * invResolution;
 
-    // TODO: USE THIS?
     uint2 pixelPosition = id.xy + _SSGI_Jitter;
     
     float depth = _CameraDepthTexture.SampleLevel(sampler_linear_clamp, uv, 0.0f).r;
@@ -84,14 +83,13 @@ void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
 
     float4 Out_ColorMask = float4(0.0, 0.0, 0.0, 0.0);
     
-    
     [loop]
     for (uint i = 0; i < (uint)_SSGI_CastRayCount; i++)
     {
         hash = Hammersley16(i, (uint)_SSGI_CastRayCount, random);
         float3 reflectionDirTS = CosineSampleHemisphere(hash).xyz;
-        reflectionDirTS.xy = UniformSampleDiskConcentric(hash);
-        reflectionDirTS.z = sqrt(1.0 - reflectionDirTS.x * reflectionDirTS.x - reflectionDirTS.y * reflectionDirTS.y);
+        // reflectionDirTS.xy = UniformSampleDiskConcentric(hash);
+        // reflectionDirTS.z = sqrt(1.0 - reflectionDirTS.x * reflectionDirTS.x - reflectionDirTS.y * reflectionDirTS.y);
         float3 reflectionDirWS = TangentToWorld(reflectionDirTS, float4(worldNormal, 1.0)).xyz;
         float3 reflectionDirVS = mul(_SSGI_ViewMatrix, float4(reflectionDirWS, 1.0)).xyz;
         // float3 reflectionDirVS = TangentToWorld(reflectionDirTS, float4(worldNormal, 1.0)).xyz;
@@ -118,13 +116,32 @@ void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
         float mask = RayHitData.a * GetScreenFadeBord(RayHitData.xy, _SSGI_ScreenFade);
 
         Out_ColorMask += float4(sampleColor, mask * mask);
-
-
-        _SSGI_Out_ColorMask_RT[id.xy] = float4(sampleColor, RayHitData.a);
-        // _SSGI_Out_ColorMask_RT[id.xy] = float4(rayDir, 0.0);
-
+        // _SSGI_Out_ColorMask_RT[id.xy] = mask;
     }
-    // _SSGI_Out_ColorMask_RT[id.xy] = float4(viewPos, 1.0);
+    Out_ColorMask.rgb /= _SSGI_CastRayCount;
+    Out_ColorMask.rgb *= rcp(1 - Luminance(Out_ColorMask.rgb));
+    Out_ColorMask.a /= _SSGI_CastRayCount;
+
+    _SSGI_Out_ColorMask_RT[id.xy] = Out_ColorMask;
+    // _SSGI_Out_ColorMask_RT[id.xy] = float4(hash, 0.0, 1.0);
 
 }
 
+Texture2D _SSGI_TraceResult_RT;
+
+RWTexture2D<float4> _SSGI_Out_Combine_RT;
+
+[numthreads(8, 8, 1)]
+void SSGI_Combine(uint3 id : SV_DispatchThreadID)
+{
+    float2 resolution = _SSGI_BufferSize.xy;
+    float2 invResolution = _SSGI_BufferSize.zw;
+    float2 uv = (id.xy + 0.5) * invResolution;
+
+    float3 albedo = _GBuffer0.SampleLevel(sampler_bilinear_clamp, uv, 0).rgb;
+    float3 sceneColor = _SSGI_SceneColor_RT.SampleLevel(sampler_bilinear_clamp, uv, 0).rgb;
+    float3 ssgiColor = _SSGI_TraceResult_RT.SampleLevel(sampler_bilinear_clamp, uv, 0).rgb;
+
+    // _SSGI_Out_Combine_RT[id.xy] = float4(sceneColor + albedo * ssgiColor, 1.0);
+    _SSGI_Out_Combine_RT[id.xy] = float4(albedo * ssgiColor, 1.0);
+}

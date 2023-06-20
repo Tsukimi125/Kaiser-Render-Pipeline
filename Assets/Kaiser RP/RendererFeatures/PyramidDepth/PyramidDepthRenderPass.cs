@@ -62,7 +62,7 @@ public class PyramidDepthRenderPass : ScriptableRenderPass
                 mipSize.x /= 2;
                 mipSize.y /= 2;
 
-                if(mipSize.x < 1 || mipSize.y < 1)
+                if (mipSize.x < 1 || mipSize.y < 1)
                 {
                     break;
                 }
