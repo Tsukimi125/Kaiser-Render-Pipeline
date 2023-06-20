@@ -164,6 +164,13 @@ public class SSGIRenderPass : ScriptableRenderPass
             cmd.EndSample("Combine");
         }
 
+        // release
+        cmd.ReleaseTemporaryRT(SSGI_Input.SceneColor);
+        cmd.ReleaseTemporaryRT(SSGI_Input.PyramidDepth);
+        cmd.ReleaseTemporaryRT(SSGI_Output.ColorMask);
+        cmd.ReleaseTemporaryRT(SSGI_Output.Combine);
+
+
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);
     }

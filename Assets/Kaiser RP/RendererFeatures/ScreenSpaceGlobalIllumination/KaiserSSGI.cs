@@ -9,7 +9,7 @@ public class KaiserSSGI : ScriptableRendererFeature
     public override void Create()
     {
         m_ScriptablePass = new SSGIRenderPass(settings);
-        m_ScriptablePass.renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
+        // m_ScriptablePass.renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)

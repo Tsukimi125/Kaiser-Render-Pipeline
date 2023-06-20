@@ -122,7 +122,7 @@ MonoBehaviour:
     SSGI_CastRayCount: 1
     SSGI_Intensity: 1
     SSGI_Thickness: 0.1
-    SSGI_ScreenFade: 0.1
+    SSGI_ScreenFade: 0.026
     Hiz_MaxLevel: 10
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
