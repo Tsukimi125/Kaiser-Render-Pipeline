@@ -8,14 +8,14 @@ public class KaiserSSRT : ScriptableRendererFeature
 {
     public SSRTRenderPass ssrtRenderPass;
     public SSRTSettings settings = new SSRTSettings();
-
+    public override void Create()
+    {
+        ssrtRenderPass = new SSRTRenderPass(settings);
+    }
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
         renderer.EnqueuePass(ssrtRenderPass);
     }
 
-    public override void Create()
-    {
-        ssrtRenderPass = new SSRTRenderPass(settings);
-    }
+
 }

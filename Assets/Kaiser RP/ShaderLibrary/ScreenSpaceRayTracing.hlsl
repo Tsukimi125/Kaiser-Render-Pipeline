@@ -6,6 +6,43 @@
 
 #define RAY_BIAS 0.05f
 
+// SSGI
+
+float2 UniformSampleDiskConcentric(float2 E)
+{
+    float2 p = 2 * E - 1;
+    float Radius;
+    float Phi;
+    if (abs(p.x) > abs(p.y))
+    {
+        Radius = p.x;
+        Phi = (PI / 4) * (p.y / p.x);
+    }
+    else
+    {
+        Radius = p.y;
+        Phi = (PI / 2) - (PI / 4) * (p.x / p.y);
+    }
+    return float2(Radius * cos(Phi), Radius * sin(Phi));
+}
+
+float4 CosineSampleHemisphere(float2 E)
+{
+    float Phi = 2 * Pi * E.x;
+    float CosTheta = sqrt(E.y);
+    float SinTheta = sqrt(1 - CosTheta * CosTheta);
+
+    float3 H;
+    H.x = SinTheta * cos(Phi);
+    H.y = SinTheta * sin(Phi);
+    H.z = CosTheta;
+
+    float PDF = CosTheta / Pi;
+    return float4(H, PDF);
+}
+
+
+// SSR
 float3x3 GetTangentBasis(float3 TangentZ)
 {
     float3 UpVector = abs(TangentZ.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
