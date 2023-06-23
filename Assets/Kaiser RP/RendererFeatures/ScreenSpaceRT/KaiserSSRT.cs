@@ -6,11 +6,11 @@ using UnityEngine.Rendering.Universal;
 
 public class KaiserSSRT : ScriptableRendererFeature
 {
-    public SSRTRenderPass ssrtRenderPass;
-    public SSRTSettings settings = new SSRTSettings();
+    public StochasticSSRRenderPass ssrtRenderPass;
+    public StochasticSSRSettings settings = new StochasticSSRSettings();
     public override void Create()
     {
-        ssrtRenderPass = new SSRTRenderPass(settings);
+        ssrtRenderPass = new StochasticSSRRenderPass(settings);
     }
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {

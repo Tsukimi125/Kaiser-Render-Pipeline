@@ -51,8 +51,6 @@ int _Hiz_RaySteps;
 float _SSR_TemporalWeight;
 float _SSR_TemporalScale;
 
-
-
 [numthreads(8, 8, 1)]
 void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
 {
@@ -82,7 +80,6 @@ void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
     viewPos.z = -viewPos.z;
 
     // rand gen
-
     uint frameIDMod8 = uint(fmod(_SSR_FrameIndex, 8));
     uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
     float2 hash = Hammersley16(0, (uint)1, random);

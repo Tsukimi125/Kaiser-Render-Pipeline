@@ -1,14 +1,30 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-
 public class SSGIRenderPass : ScriptableRenderPass
 {
-    SSGISettings settings;
+    private SSGISettings settings; //基本参数
+    private Material material; //材质
+
+
+    private static class SSGI_InputIDs
+    {
+        public static int SceneColor = Shader.PropertyToID("_SSGI_SceneColor_RT");
+        public static int PyramidDepth = Shader.PropertyToID("_PyramidDepth");
+    }
+
+    private static class SSGI_OutputIDs
+    {
+
+        public static int ColorMask = Shader.PropertyToID("_SSGI_Out_ColorMask");
+        public static int Combine = Shader.PropertyToID("_SSGI_Out_Combine");
+    }
+
     private static class SSGI_Matrix
     {
-        public static Matrix4x4 View;
         public static Matrix4x4 Proj;
         public static Matrix4x4 InvProj;
         public static Matrix4x4 InvViewProj;
@@ -16,112 +32,44 @@ public class SSGIRenderPass : ScriptableRenderPass
         public static Matrix4x4 PrevViewProj;
     }
 
-    private static class SSGI_Input
-    {
-        public static int SceneColor = Shader.PropertyToID("_SSGI_SceneColor_RT");
-        public static int PyramidDepth = Shader.PropertyToID("_PyramidDepth");
-    }
-
-    private static class SSGI_Output
-    {
-        public static int ColorMask = Shader.PropertyToID("_SSGI_Out_ColorMask_RT");
-        public static int Combine = Shader.PropertyToID("_SSGI_Out_Combine_RT");
-    }
-
-
-
     public SSGIRenderPass(SSGISettings settings)
     {
         this.settings = settings;
         this.renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
-        profilingSampler = new ProfilingSampler("[Kaiser] ScreenSpaceGlobalIllumination");
+        profilingSampler = new ProfilingSampler("[Kaiser] SSSGI");
     }
-
-    private int frameIndex = 0;
-    private const int sampleCount = 64;
-    private Vector2 randomSampler = new Vector2(1.0f, 1.0f);
-    private float GetHaltonValue(int index, int radix)
+    private RandomSampler randomSampler = new RandomSampler(0, 64);
+    public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
-        float result = 0f;
-        float fraction = 1f / radix;
-
-        while (index > 0)
-        {
-            result += (index % radix) * fraction;
-            index /= radix;
-            fraction /= radix;
-        }
-        return result;
-    }
-    private Vector2 GenerateRandomOffset()
-    {
-        var offset = new Vector2(GetHaltonValue(frameIndex & 1023, 2), GetHaltonValue(frameIndex & 1023, 3));
-        if (frameIndex++ >= sampleCount)
-            frameIndex = 0;
-        return offset;
+        ConfigureInput(ScriptableRenderPassInput.Depth | ScriptableRenderPassInput.Normal);
+        // randomSampler = new RandomSampler(0, 64);
     }
 
 
-    void UpdateTransformMatrix(Camera camera)
+    void UpdateTransformMatrix(CommandBuffer cmd, Camera camera)
     {
-        SSGI_Matrix.View = camera.worldToCameraMatrix;
         SSGI_Matrix.Proj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false);
         SSGI_Matrix.InvProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
         SSGI_Matrix.InvViewProj = camera.cameraToWorldMatrix *
             GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
         SSGI_Matrix.ViewProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
-    }
 
-
-    void UpdateParameters(CommandBuffer cmd, int width, int height)
-    {
-        randomSampler = GenerateRandomOffset();
-
-        cmd.SetComputeIntParam(settings.computeShader, "_SSGI_FrameIndex", frameIndex);
-        cmd.SetComputeIntParam(settings.computeShader, "_SSGI_CastRayCount", settings.SSGI_CastRayCount);
-        cmd.SetComputeVectorParam(settings.computeShader, "_SSGI_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
-        cmd.SetComputeVectorParam(settings.computeShader, "_SSGI_Jitter", new Vector2(randomSampler.x, randomSampler.y));
-        cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_Thickness", settings.SSGI_Thickness);
-        cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_ScreenFade", settings.SSGI_ScreenFade);
-        cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_Intensity", settings.SSGI_Intensity);
-
-
-        cmd.SetComputeMatrixParam(settings.computeShader, "_SSGI_ViewMatrix", SSGI_Matrix.View);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSGI_ProjMatrix", SSGI_Matrix.Proj);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSGI_InvProjMatrix", SSGI_Matrix.InvProj);
-        cmd.SetComputeMatrixParam(settings.computeShader, "_SSGI_ViewProjMatrix", SSGI_Matrix.ViewProj);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSGI_InvViewProjMatrix", SSGI_Matrix.InvViewProj);
-
-        cmd.SetComputeIntParam(settings.computeShader, "_Hiz_MaxLevel", settings.Hiz_MaxLevel);
-        cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StartLevel", settings.Hiz_StartLevel);
-        cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StopLevel", settings.Hiz_StopLevel);
-        cmd.SetComputeIntParam(settings.computeShader, "_Hiz_RaySteps", settings.Hiz_RaySteps);
-
-        cmd.SetComputeTextureParam(settings.computeShader, 0, "_SSGI_PyramidDepth_RT", settings.noiseTex);
-    }
-    public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
-    {
-        // ConfigureTarget(renderingData.cameraData.renderer.cameraColorTargetHandle, renderingData.cameraData.renderer.cameraColorTargetHandle);
+        cmd.SetComputeMatrixParam(settings.computeShader, "_SSGI_ViewProjMatrix", SSGI_Matrix.ViewProj);
     }
 
-    public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
+    void UpdatePreviousTransformMatrix(CommandBuffer cmd, Camera camera)
     {
-        ConfigureInput(ScriptableRenderPassInput.Depth | ScriptableRenderPassInput.Normal);
+        SSGI_Matrix.PrevViewProj = camera.cameraToWorldMatrix *
+            GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
+
+        cmd.SetComputeMatrixParam(settings.computeShader, "_SSGI_PrevViewProjMatrix", SSGI_Matrix.PrevViewProj);
     }
-    public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+
+    void UpdateRenderTextures(CommandBuffer cmd, int width, int height)
     {
-        var cmd = CommandBufferPool.Get();
-
-        int k1 = settings.computeShader.FindKernel("SSGI_RayTracing");
-
-        int k3 = settings.computeShader.FindKernel("SSGI_Combine");
-
-        int width = renderingData.cameraData.cameraTargetDescriptor.width;
-        int height = renderingData.cameraData.cameraTargetDescriptor.height;
-
-        UpdateParameters(cmd, width, height);
-        UpdateTransformMatrix(renderingData.cameraData.camera);
-
         RenderTextureDescriptor descriptorDefault = new RenderTextureDescriptor(
                     width, height, RenderTextureFormat.Default, 0, 0);
         descriptorDefault.sRGB = false;
@@ -132,51 +80,101 @@ public class SSGIRenderPass : ScriptableRenderPass
         descriptorR8.sRGB = false;
         descriptorR8.enableRandomWrite = true;
 
-        cmd.GetTemporaryRT(SSGI_Input.SceneColor, descriptorDefault);
-        cmd.GetTemporaryRT(SSGI_Input.PyramidDepth, descriptorDefault);
-        cmd.GetTemporaryRT(SSGI_Output.ColorMask, descriptorDefault);
-        cmd.GetTemporaryRT(SSGI_Output.Combine, descriptorDefault);
+        cmd.GetTemporaryRT(SSGI_InputIDs.SceneColor, descriptorDefault);
+
+        cmd.GetTemporaryRT(SSGI_OutputIDs.ColorMask, descriptorDefault);
+        cmd.GetTemporaryRT(SSGI_OutputIDs.Combine, descriptorDefault);
+
+    }
+
+    void UpdateParameters(CommandBuffer cmd, int width, int height)
+    {
+        // Init SSGI Settings
+        cmd.SetComputeVectorParam(settings.computeShader, "_SSGI_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
+        cmd.SetComputeIntParam(settings.computeShader, "_SSGI_CastRayCount", settings.SSGI_CastRayCount);
+        cmd.SetComputeIntParam(settings.computeShader, "_SSGI_FrameIndex", randomSampler.frameIndex);
+        cmd.SetComputeVectorParam(settings.computeShader, "_SSGI_Jitter", randomSampler.GetRandomOffset());
+        cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_Intensity", settings.SSGI_Intensity);
+        cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_Thickness", settings.SSGI_Thickness);
+        cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_ScreenFade", settings.SSGI_ScreenFade);
+        cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_TemporalWeight", settings.Temporal_Weight);
+        cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_TemporalScale", settings.Temporal_Scale);
+        cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_Thickness", settings.SSGI_Thickness);
+
+        // Init Hiz Trace Settings
+        cmd.SetComputeIntParam(settings.computeShader, "_Hiz_MaxLevel", settings.Hiz_MaxLevel);
+        cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StartLevel", settings.Hiz_StartLevel);
+        cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StopLevel", settings.Hiz_StopLevel);
+        cmd.SetComputeIntParam(settings.computeShader, "_Hiz_RaySteps", settings.Hiz_RaySteps);
+    }
+
+    void ReleaseTemporaryRT(CommandBuffer cmd)
+    {
+        cmd.ReleaseTemporaryRT(SSGI_InputIDs.SceneColor);
+        cmd.ReleaseTemporaryRT(SSGI_OutputIDs.ColorMask);
+        cmd.ReleaseTemporaryRT(SSGI_OutputIDs.Combine);
+    }
+    public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
+    {
+        var cmd = CommandBufferPool.Get();
+
+        int k1 = settings.computeShader.FindKernel("SSGI_RayTracing");
+        int k4 = settings.computeShader.FindKernel("SSGI_Combine");
 
         using (new ProfilingScope(cmd, profilingSampler))
         {
-            cmd.BeginSample("RayTracing");
+            int width = renderingData.cameraData.cameraTargetDescriptor.width;
+            int height = renderingData.cameraData.cameraTargetDescriptor.height;
+
+            randomSampler.RefreshFrame();
+
+            UpdateTransformMatrix(cmd, renderingData.cameraData.camera);
+            UpdateRenderTextures(cmd, width, height);
+            UpdateParameters(cmd, width, height);
+
+            cmd.BeginSample("Ray Tracing");
             {
-                cmd.Blit(renderingData.cameraData.renderer.cameraColorTargetHandle, SSGI_Input.SceneColor);
+                // Init Input Texture
+                cmd.Blit(Shader.GetGlobalTexture("_BlitTexture"), SSGI_InputIDs.SceneColor);
+                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_SceneColor_RT", SSGI_InputIDs.SceneColor);
+                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_PyramidDepth_RT", SSGI_InputIDs.PyramidDepth);
 
-                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_SceneColor_RT", SSGI_Input.SceneColor);
-                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_PyramidDepth_RT", SSGI_Input.PyramidDepth);
-                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_Out_ColorMask_RT", SSGI_Output.ColorMask);
+                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_Out_ColorMask", SSGI_OutputIDs.ColorMask);
 
+                // Dispatch
                 cmd.DispatchCompute(settings.computeShader, k1, width / 8, height / 8, 1);
             }
+            cmd.EndSample("Ray Tracing");
 
-            cmd.EndSample("RayTracing");
+            cmd.BeginSample("Spatial Filter");
+            {
+
+            }
+            cmd.EndSample("Spatial Filter");
+
+            cmd.BeginSample("Temporal Filter");
+            {
+
+            }
+            cmd.EndSample("Temporal Filter");
 
             cmd.BeginSample("Combine");
             {
-                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSGI_SceneColor_RT", SSGI_Input.SceneColor);
-                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSGI_TraceResult_RT", SSGI_Output.ColorMask);
-                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSGI_Out_Combine_RT", SSGI_Output.Combine);
-
-                cmd.DispatchCompute(settings.computeShader, k3, width / 8, height / 8, 1);
-                cmd.Blit(SSGI_Output.Combine, renderingData.cameraData.renderer.cameraColorTargetHandle);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_SceneColor_RT", SSGI_InputIDs.SceneColor);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_ColorMask", SSGI_OutputIDs.ColorMask);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_Out_Combine", SSGI_OutputIDs.Combine);
+                cmd.DispatchCompute(settings.computeShader, k4, width / 8, height / 8, 1);
             }
             cmd.EndSample("Combine");
+
+            cmd.Blit(SSGI_OutputIDs.Combine, renderingData.cameraData.renderer.cameraColorTargetHandle);
+
+            ReleaseTemporaryRT(cmd);
         }
 
-        // release
-        cmd.ReleaseTemporaryRT(SSGI_Input.SceneColor);
-        cmd.ReleaseTemporaryRT(SSGI_Input.PyramidDepth);
-        cmd.ReleaseTemporaryRT(SSGI_Output.ColorMask);
-        cmd.ReleaseTemporaryRT(SSGI_Output.Combine);
-
+        UpdatePreviousTransformMatrix(cmd, renderingData.cameraData.camera);
 
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);
-    }
-
-    public override void OnCameraCleanup(CommandBuffer cmd)
-    {
-
     }
 }

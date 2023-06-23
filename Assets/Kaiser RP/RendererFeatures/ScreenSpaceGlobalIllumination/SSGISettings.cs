@@ -8,8 +8,6 @@ using UnityEngine.Rendering.Universal;
 public class SSGISettings
 {
     public ComputeShader computeShader;
-    public Texture2D noiseTex; //蓝噪声纹理
-
     [Header("SSGI_Global")]
     [Range(0, 16)]
     public int SSGI_CastRayCount = 1;

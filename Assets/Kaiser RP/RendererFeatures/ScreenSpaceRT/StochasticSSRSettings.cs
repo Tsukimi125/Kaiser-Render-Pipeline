@@ -5,13 +5,10 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
 [System.Serializable]
-public class SSRTSettings
+public class StochasticSSRSettings
 {
-    // Pass在渲染管线中的执行位置，这里设置为【BeforeRenderingPostProcessing】
-    public RenderPassEvent passEvent = RenderPassEvent.BeforeRenderingPostProcessing;
-    public Shader shader; //所用Shader
     public ComputeShader computeShader; //所用ComputeShader
-    public Texture2D noiseTex; //蓝噪声纹理
+
     [Header("SSR_Global")]
     [Range(0, 1)]
     public float SSR_Thickness = 0.1f; //SSR分辨率
@@ -38,15 +35,4 @@ public class SSRTSettings
     [Range(1, 5)]
     [SerializeField]
     public float Temporal_Scale = 1.25f;
-
-
-    public enum DebugMode
-    {
-        None,
-        TraceDirection,
-        HitUV,
-        ReflectionColor
-    }
-
-    public DebugMode debugMode = DebugMode.None;
 }
