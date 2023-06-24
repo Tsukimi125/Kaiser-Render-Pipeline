@@ -167,7 +167,14 @@ public class SSGIRenderPass : ScriptableRenderPass
             }
             cmd.EndSample("Combine");
 
-            cmd.Blit(SSGI_OutputIDs.Combine, renderingData.cameraData.renderer.cameraColorTargetHandle);
+            if (settings.Debug_ColorMask)
+            {
+                cmd.Blit(SSGI_OutputIDs.ColorMask, renderingData.cameraData.renderer.cameraColorTargetHandle);
+            }
+            else
+            {
+                cmd.Blit(SSGI_OutputIDs.Combine, renderingData.cameraData.renderer.cameraColorTargetHandle);
+            }
 
             ReleaseTemporaryRT(cmd);
         }

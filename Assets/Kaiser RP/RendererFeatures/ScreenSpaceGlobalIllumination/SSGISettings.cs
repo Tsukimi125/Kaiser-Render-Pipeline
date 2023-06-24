@@ -11,7 +11,7 @@ public class SSGISettings
     [Header("SSGI_Global")]
     [Range(0, 16)]
     public int SSGI_CastRayCount = 1;
-    [Range(0, 4)]
+    [Range(0, 32)]
     public float SSGI_Intensity = 1;
     [Range(0, 1)]
     public float SSGI_Thickness = 0.1f;
@@ -39,4 +39,7 @@ public class SSGISettings
     [Range(1, 5)]
     [SerializeField]
     public float Temporal_Scale = 1.25f;
+
+    [Header("Debug")]
+    public bool Debug_ColorMask = false;
 }

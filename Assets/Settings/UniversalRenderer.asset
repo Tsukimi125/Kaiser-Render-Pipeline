@@ -115,13 +115,14 @@ MonoBehaviour:
   settings:
     computeShader: {fileID: 7200000, guid: 713a486e6bec305438e4e4b1c40497d4, type: 3}
     SSGI_CastRayCount: 1
-    SSGI_Intensity: 1
-    SSGI_Thickness: 0.061
-    SSGI_ScreenFade: 0.1
-    Hiz_MaxLevel: 7
+    SSGI_Intensity: 2.2
+    SSGI_Thickness: 0.1
+    SSGI_ScreenFade: 0.157
+    Hiz_MaxLevel: 10
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
-    Hiz_RaySteps: 64
+    Hiz_RaySteps: 39
     Spatial_Resolve: 9
     Temporal_Weight: 0.98
-    Temporal_Scale: 1.25
+    Temporal_Scale: 1.2
+    Debug_ColorMask: 0

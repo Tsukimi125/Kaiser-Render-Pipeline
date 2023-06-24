@@ -183,7 +183,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: b6b49f04e6e981241add6de2e67a02b3, type: 2}
+  - {fileID: 2100000, guid: 763fd82a44b9cf84d9935649ba576622, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -820,9 +820,9 @@ Light:
   serializedVersion: 10
   m_Type: 2
   m_Shape: 0
-  m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
-  m_Intensity: 1
-  m_Range: 15
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Intensity: 3
+  m_Range: 7
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
@@ -879,7 +879,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1425726601}
   m_LocalRotation: {x: -0, y: -0.0026520686, z: 0, w: 0.9999965}
-  m_LocalPosition: {x: 0.24, y: 1.18, z: 5.74}
+  m_LocalPosition: {x: -4.88, y: -0.1, z: 4.83}
   m_LocalScale: {x: 1, y: 0.85322356, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
