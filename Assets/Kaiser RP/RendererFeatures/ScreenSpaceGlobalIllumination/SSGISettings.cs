@@ -17,6 +17,8 @@ public class SSGISettings
     public float SSGI_Thickness = 0.1f;
     [Range(0, 1)]
     public float SSGI_ScreenFade = 0.1f;
+    [Range(0, 256)]
+    public int SSGI_MaxRaySteps = 64;
 
 
     [Header("Hiz Trace")]
@@ -26,8 +28,7 @@ public class SSGISettings
     public int Hiz_StartLevel = 1;
     [Range(0, 10)]
     public int Hiz_StopLevel = 0;
-    [Range(0, 256)]
-    public int Hiz_RaySteps = 64;
+
 
     [Header("Filtering")]
     [Range(0, 10)]

@@ -1,3 +1,4 @@
+#pragma kernel SSGI_Linear
 #pragma kernel SSGI_RayTracing
 #pragma kernel SSGI_RayTracing_
 
@@ -54,9 +55,82 @@ float _SSGI_ScreenFade;
 int _Hiz_MaxLevel;
 int _Hiz_StartLevel;
 int _Hiz_StopLevel;
-int _Hiz_RaySteps;
+int _SSGI_MaxRaySteps;
 float _SSGI_TemporalWeight;
 float _SSGI_TemporalScale;
+
+
+
+
+
+
+[numthreads(8, 8, 1)]
+void SSGI_Linear(uint3 id : SV_DispatchThreadID)
+{
+    float2 resolution = _SSGI_BufferSize.xy;
+    float2 invResolution = _SSGI_BufferSize.zw;
+    float2 uv = (id.xy + _SSGI_Jitter) * invResolution;
+
+    // TODO: USE THIS?
+    uint2 pixelPosition = id.xy + _SSGI_Jitter;
+    
+    float depth = _CameraDepthTexture.SampleLevel(sampler_linear_clamp, uv, 0.0f).r;
+    if (depth <= 1e-7)
+    {
+        _SSGI_Out_ColorMask[id.xy] = 0;
+        return;
+    }
+
+    float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
+    float3 worldNormal = UnpackNormal(gbuffer2.xyz);
+    float3 viewNormal = TransformWorldToViewNormal(worldNormal);
+
+    float4 NDCPos = ComputeClipSpacePosition(uv, depth);
+    float3 worldPos = ComputeWorldSpacePosition(uv, depth, _SSGI_InvViewProjMatrix);
+    float3 viewPos = ComputeViewSpacePosition(uv, depth, _SSGI_InvProjMatrix);
+    viewPos.z = -viewPos.z;
+
+    // rand gen
+    uint frameIDMod8 = uint(fmod(_SSGI_FrameIndex, 8));
+    uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
+
+    float3 finalColor = float3(0.0, 0.0, 0.0);
+
+    for (uint i = 0; i < (uint)_SSGI_CastRayCount; ++i)
+    {
+        float2 hash = Hammersley16(i, (uint)_SSGI_CastRayCount, random);
+
+        
+
+
+        // bool Linear2D_Trace(TEXTURE2D(frontDepth),
+        // float3 csOrigin,
+        // float3 csDirection,
+        // float4x4 projectMatrix,
+        // float2 csZBufferSize,
+        // float jitter,
+        // int maxSteps,
+        // float layerThickness,
+        // float traceDistance,
+        // in out float2 hitPixel,
+        // int stepSize,
+        // bool traceBehind,
+        // in out float3 csHitPoint,
+        // in out float stepCount)
+        float rayBump = max(-0.01 * viewPos.z, 0.001);
+        float3 rayOrigin = viewPos + viewNormal * rayBump;
+        
+        float4 H = TangentToWorld(CosineSampleHemisphere(hash).xyz, float4(viewNormal, 1.0));
+        float3 reflectionDir = H.xyz;
+
+        float jitter = hash.x + hash.y;
+
+        // bool hit = Linear2D_Trace(_CameraDepthTexture, rayOrigin, reflectionDir, _SSGI_ProjMatrix, _SSGI_BufferSize, jitter, _SSGI_RaySteps, _SSGI_Thickness, _SSGI_TraceDistance, Ray_HitUV, _SSGI_RayStepSize, _SSGI_TraceBehind == 1, Ray_HitPoint, Ray_NumMarch);
+
+    }
+
+    _SSGI_Out_ColorMask[id.xy] = float4(finalColor, 1.0);
+}
 
 
 
@@ -67,7 +141,6 @@ void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
     float2 invResolution = _SSGI_BufferSize.zw;
     float2 uv = (id.xy + _SSGI_Jitter) * invResolution;
 
-    // TODO: USE THIS?
     uint2 pixelPosition = id.xy + _SSGI_Jitter;
     
     float depth = _CameraDepthTexture.SampleLevel(sampler_linear_clamp, uv, 0.0f).r;
@@ -107,7 +180,7 @@ void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
 
         float4 RayHitData = Hierarchical_Z_Trace(
             _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-            _Hiz_RaySteps, _SSGI_Thickness, resolution,
+            _SSGI_MaxRaySteps, _SSGI_Thickness, resolution,
             rayStart, rayDir, _SSGI_PyramidDepth_RT
         );
 
@@ -118,15 +191,14 @@ void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
         // _SSGI_Out_ColorMask[id.xy] = float4(sampleColor * RayHitData.a * RayHitData.a, 1.0);
         // _SSGI_Out_ColorMask[id.xy] = float4(RayHitData.xy, 0.0, 1.0);
         // _SSGI_Out_ColorMask[id.xy] = float4(RayHitData.z, 0.0, 0.0, 1.0);
-        // _SSGI_Out_ColorMask[id.xy] = float4(RayHitData.z, 0.0, 0.0, 1.0);
+        // _SSGI_Out_ColorMask[id.xy] = float4(RayHitData.a, 0.0, 0.0, 1.0);
 
         float occlusion = 1 - saturate(dot(reflectionDir, TransformWorldToViewNormal(sampleNormal)));
-        sampleColor = saturate(sampleColor - sceneColor);
+        // sampleColor = saturate(sampleColor - sceneColor);
         sampleColor = saturate((sampleColor) * RayHitData.a * RayHitData.a);
         sampleColor *= rcp(1 + Luminance(sampleColor));
         sampleColor *= occlusion;
         finalColor += sampleColor;
-
     }
     
     finalColor *= rcp(_SSGI_CastRayCount);
@@ -134,6 +206,9 @@ void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
 
     _SSGI_Out_ColorMask[id.xy] = float4(finalColor, 1.0);
 }
+
+
+
 
 [numthreads(8, 8, 1)]
 void SSGI_RayTracing_(uint3 id : SV_DispatchThreadID)
@@ -181,7 +256,7 @@ void SSGI_RayTracing_(uint3 id : SV_DispatchThreadID)
     //     reflectionDirVS.y *= -1;
 
     //     _SSGI_Out_ColorMask[id.xy] = float4(reflectionDirVS, 1.0);
-        
+    
     //     float4 rayProj = mul(_SSGI_ProjMatrix, float4(viewPos + reflectionDirVS, 1.0));
 
     //     rayProj = rayProj / rayProj.w;
@@ -197,7 +272,7 @@ void SSGI_RayTracing_(uint3 id : SV_DispatchThreadID)
     //     int hit, isSky;
     //     bool reflectSky = false;
     //     float3 RayHitData = hiZTrace(_Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-    //     rayStart, rayDir, _Hiz_RaySteps, resolution,
+    //     rayStart, rayDir, _SSGI_MaxRaySteps, resolution,
     //     _SSGI_PyramidDepth_RT, sampler_bilinear_clamp, reflectSky,
     //     hit, isSky);
 
@@ -212,9 +287,9 @@ void SSGI_RayTracing_(uint3 id : SV_DispatchThreadID)
 
     //     finalColor += sampleColor;
 
-        
+    
     //     // _SSGI_Out_ColorMask[id.xy] = float4(mask, mask, mask, mask);
-        
+    
     // }
     
     // finalColor *= rcp(_SSGI_CastRayCount);
@@ -225,8 +300,7 @@ void SSGI_RayTracing_(uint3 id : SV_DispatchThreadID)
     // // float mask = RayHitData.a * GetScreenFadeBord(RayHitData.xy, _SSGI_ScreenFade);
     // // _SSGI_Out_ColorMask[id.xy] = float4(finalColor, saturate(mask * mask));
     // _SSGI_Out_ColorMask[id.xy] = float4(finalColor, 1.0);
-    
-    
+
 }
 
 #pragma kernel SSGI_Combine

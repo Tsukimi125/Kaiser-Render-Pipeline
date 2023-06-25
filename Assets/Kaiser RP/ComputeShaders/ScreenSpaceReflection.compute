@@ -29,6 +29,7 @@ TEXTURE2D_X_HALF(_GBuffer0);
 TEXTURE2D_X_HALF(_GBuffer1);
 TEXTURE2D_X_HALF(_GBuffer2);
 // SAMPLER(sampler_linear_clamp);
+SAMPLER(sampler_point_clamp);
 SAMPLER(sampler_linear_clamp);
 SAMPLER(sampler_bilinear_clamp);
 
@@ -47,7 +48,7 @@ float _SSR_ScreenFade;
 int _Hiz_MaxLevel;
 int _Hiz_StartLevel;
 int _Hiz_StopLevel;
-int _Hiz_RaySteps;
+int _SSR_MaxRaySteps;
 float _SSR_TemporalWeight;
 float _SSR_TemporalScale;
 
@@ -104,7 +105,7 @@ void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
     
     float4 RayHitData = Hierarchical_Z_Trace(
         _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-        _Hiz_RaySteps, _SSR_Thickness, resolution,
+        _SSR_MaxRaySteps, _SSR_Thickness, resolution,
         rayStart, rayDir, _SSR_PyramidDepth_RT
     );
     
