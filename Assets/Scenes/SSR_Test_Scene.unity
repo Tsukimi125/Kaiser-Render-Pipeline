@@ -183,7 +183,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 763fd82a44b9cf84d9935649ba576622, type: 2}
+  - {fileID: 2100000, guid: 45a35430f0d852d45982585f3e52fec0, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -513,7 +513,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 45a35430f0d852d45982585f3e52fec0, type: 2}
+  - {fileID: 2100000, guid: 763fd82a44b9cf84d9935649ba576622, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -821,8 +821,8 @@ Light:
   m_Type: 2
   m_Shape: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 3
-  m_Range: 7
+  m_Intensity: 4
+  m_Range: 4
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize: 10
@@ -879,8 +879,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1425726601}
   m_LocalRotation: {x: -0, y: -0.0026520686, z: 0, w: 0.9999965}
-  m_LocalPosition: {x: -4.88, y: -0.1, z: 4.83}
-  m_LocalScale: {x: 1, y: 0.85322356, z: 1}
+  m_LocalPosition: {x: -3.05, y: 3.82, z: 8.75}
+  m_LocalScale: {x: 0.67296, y: 0.5741853, z: 0.67296}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1098,7 +1098,7 @@ MonoBehaviour:
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
-  m_RenderPostProcessing: 0
+  m_RenderPostProcessing: 1
   m_Antialiasing: 3
   m_AntialiasingQuality: 2
   m_StopNaN: 0
@@ -1113,7 +1113,7 @@ MonoBehaviour:
   m_RequiresColorTexture: 0
   m_Version: 2
   m_TaaSettings:
-    quality: 3
+    quality: 1
     frameInfluence: 0.1
     jitterScale: 1
     mipBias: 0

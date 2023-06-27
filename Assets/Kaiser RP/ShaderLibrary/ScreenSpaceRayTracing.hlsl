@@ -31,8 +31,29 @@ float4 TangentToWorld(float3 Vec, float4 TangentZ)
     return half4(T2W, TangentZ.a);
 }
 
+inline float GetScreenFadeBord(float2 pos, float value)
+{
+    float borderDist = min(1 - max(pos.x, pos.y), min(pos.x, pos.y));
+    return saturate(borderDist > value ? 1 : borderDist / value);
+}
 
 // Linear Trace
+
+float3 ReconstructCSPosition(float4 _MainTex_TexelSize, float4 _ProjInfo, float2 S, float z)
+{
+    float linEyeZ = -LinearEyeDepth(z, _ZBufferParams);
+    return float3((((S.xy * _MainTex_TexelSize.zw)) * _ProjInfo.xy + _ProjInfo.zw) * linEyeZ, linEyeZ);
+}
+
+float3 GetPosition(TEXTURE2D(depth), SamplerState depthSampler, float4 _MainTex_TexelSize, float4 _ProjInfo, float2 ssP)
+{
+    float3 P;
+    // P.z = SAMPLE_DEPTH_TEXTURE(depth, depthSampler, ssP.xy).r;
+    P.z = depth.SampleLevel(depthSampler, ssP.xy, 0).r;
+    P = ReconstructCSPosition(_MainTex_TexelSize, _ProjInfo, float2(ssP), P.z);
+    return P;
+}
+
 inline float distanceSquared(float2 A, float2 B)
 {
     A -= B;

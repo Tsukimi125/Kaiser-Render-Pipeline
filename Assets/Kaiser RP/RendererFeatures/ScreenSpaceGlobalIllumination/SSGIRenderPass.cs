@@ -46,7 +46,7 @@ public class SSGIRenderPass : ScriptableRenderPass
     }
 
 
-    void UpdateTransformMatrix(CommandBuffer cmd, Camera camera)
+    void UpdateTransformMatrix(CommandBuffer cmd, Camera camera, int width, int height)
     {
         SSGI_Matrix.Proj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false);
         SSGI_Matrix.InvProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
@@ -58,6 +58,14 @@ public class SSGIRenderPass : ScriptableRenderPass
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSGI_InvProjMatrix", SSGI_Matrix.InvProj);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSGI_InvViewProjMatrix", SSGI_Matrix.InvViewProj);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSGI_ViewProjMatrix", SSGI_Matrix.ViewProj);
+
+        Vector4 SSGI_ProjInfo = new Vector4
+        ((-2 / (width * SSGI_Matrix.Proj[0])),
+        (-2 / (height * SSGI_Matrix.Proj[5])),
+        ((1 - SSGI_Matrix.Proj[2]) / SSGI_Matrix.Proj[0]),
+        ((1 + SSGI_Matrix.Proj[6]) / SSGI_Matrix.Proj[5]));
+
+        cmd.SetComputeVectorParam(settings.computeShader, "_SSGI_ProjInfo", SSGI_ProjInfo);
     }
 
     void UpdatePreviousTransformMatrix(CommandBuffer cmd, Camera camera)
@@ -101,11 +109,15 @@ public class SSGIRenderPass : ScriptableRenderPass
         cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_TemporalScale", settings.Temporal_Scale);
         cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_Thickness", settings.SSGI_Thickness);
 
+        // Init Linear Trace Settings
+        cmd.SetComputeIntParam(settings.computeShader, "_Linear_MaxRaySteps", settings.Linear_MaxRaySteps);
+        cmd.SetComputeFloatParam(settings.computeShader, "_Linear_RayTraceMaxDistance", settings.Linear_RayTraceMaxDistance);
+
         // Init Hiz Trace Settings
         cmd.SetComputeIntParam(settings.computeShader, "_Hiz_MaxLevel", settings.Hiz_MaxLevel);
         cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StartLevel", settings.Hiz_StartLevel);
         cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StopLevel", settings.Hiz_StopLevel);
-        cmd.SetComputeIntParam(settings.computeShader, "_SSGI_MaxRaySteps", settings.SSGI_MaxRaySteps);
+        cmd.SetComputeIntParam(settings.computeShader, "_Hiz_MaxRaySteps", settings.SSGI_MaxRaySteps);
     }
 
     void ReleaseTemporaryRT(CommandBuffer cmd)
@@ -117,8 +129,17 @@ public class SSGIRenderPass : ScriptableRenderPass
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
         var cmd = CommandBufferPool.Get();
+        int k1;
+        if (settings.SSGI_TraceType == SSGISettings.TraceType.Linear)
+        {
+            k1 = settings.computeShader.FindKernel("SSGI_RayTracing_Linear");
+        }
+        else
+        {
+            k1 = settings.computeShader.FindKernel("SSGI_RayTracing_Hiz");
+        }
 
-        int k1 = settings.computeShader.FindKernel("SSGI_RayTracing");
+
         int k4 = settings.computeShader.FindKernel("SSGI_Combine");
 
         using (new ProfilingScope(cmd, profilingSampler))
@@ -128,7 +149,7 @@ public class SSGIRenderPass : ScriptableRenderPass
 
             randomSampler.RefreshFrame();
 
-            UpdateTransformMatrix(cmd, renderingData.cameraData.camera);
+            UpdateTransformMatrix(cmd, renderingData.cameraData.camera, width, height);
             UpdateRenderTextures(cmd, width, height);
             UpdateParameters(cmd, width, height);
 

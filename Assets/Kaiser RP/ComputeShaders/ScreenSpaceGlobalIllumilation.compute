@@ -1,5 +1,5 @@
-#pragma kernel SSGI_Linear
-#pragma kernel SSGI_RayTracing
+#pragma kernel SSGI_RayTracing_Linear
+#pragma kernel SSGI_RayTracing_Hiz
 #pragma kernel SSGI_RayTracing_
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -44,6 +44,8 @@ float4x4 _SSGI_InvViewProjMatrix;
 float4x4 _SSGI_ViewProjMatrix;
 float4x4 _SSGI_PrevViewProjMatrix;
 
+float4 _SSGI_ProjInfo;
+
 float2 _SSGI_Jitter;
 
 int _SSGI_CastRayCount;
@@ -52,20 +54,25 @@ int _SSGI_CastRayCount;
 float _SSGI_Thickness;
 float _SSGI_Intensity;
 float _SSGI_ScreenFade;
+
+int _Linear_MaxRaySteps;
+float _Linear_RayStepSize;
+float _Linear_RayTraceMaxDistance;
+
 int _Hiz_MaxLevel;
 int _Hiz_StartLevel;
 int _Hiz_StopLevel;
-int _SSGI_MaxRaySteps;
+int _Hiz_MaxRaySteps;
+
+
+
 float _SSGI_TemporalWeight;
 float _SSGI_TemporalScale;
 
 
 
-
-
-
 [numthreads(8, 8, 1)]
-void SSGI_Linear(uint3 id : SV_DispatchThreadID)
+void SSGI_RayTracing_Linear(uint3 id : SV_DispatchThreadID)
 {
     float2 resolution = _SSGI_BufferSize.xy;
     float2 invResolution = _SSGI_BufferSize.zw;
@@ -88,7 +95,13 @@ void SSGI_Linear(uint3 id : SV_DispatchThreadID)
     float4 NDCPos = ComputeClipSpacePosition(uv, depth);
     float3 worldPos = ComputeWorldSpacePosition(uv, depth, _SSGI_InvViewProjMatrix);
     float3 viewPos = ComputeViewSpacePosition(uv, depth, _SSGI_InvProjMatrix);
+    viewPos.y = -viewPos.y;
     viewPos.z = -viewPos.z;
+
+    // float3 csPos = ComputeClipSpacePosition(uv, depth).xyz;
+
+    float4 screenTexelSize = float4(1.0 / _SSGI_BufferSize.x, 1.0 / _SSGI_BufferSize.y, _SSGI_BufferSize.x, _SSGI_BufferSize.y);
+    float3 rayStart = GetPosition(_CameraDepthTexture, sampler_point_clamp, screenTexelSize, _SSGI_ProjInfo, uv);
 
     // rand gen
     uint frameIDMod8 = uint(fmod(_SSGI_FrameIndex, 8));
@@ -99,9 +112,7 @@ void SSGI_Linear(uint3 id : SV_DispatchThreadID)
     for (uint i = 0; i < (uint)_SSGI_CastRayCount; ++i)
     {
         float2 hash = Hammersley16(i, (uint)_SSGI_CastRayCount, random);
-
-        
-
+        hash.y = lerp(hash.y, 0.0, 0.3);
 
         // bool Linear2D_Trace(TEXTURE2D(frontDepth),
         // float3 csOrigin,
@@ -117,25 +128,50 @@ void SSGI_Linear(uint3 id : SV_DispatchThreadID)
         // bool traceBehind,
         // in out float3 csHitPoint,
         // in out float stepCount)
-        float rayBump = max(-0.01 * viewPos.z, 0.001);
-        float3 rayOrigin = viewPos + viewNormal * rayBump;
+        float rayBump = max(-0.01 * rayStart.z, 0.001);
+        float3 rayOrigin = rayStart + viewNormal * rayBump;
         
-        float4 H = TangentToWorld(CosineSampleHemisphere(hash).xyz, float4(viewNormal, 1.0));
-        float3 reflectionDir = H.xyz;
+        // float4 H = TangentToWorld(CosineSampleHemisphere(hash).xyz, float4(viewNormal, 1.0));
+        // float3 reflectionDir = H.xyz;
+
+        float3 L;
+        L.xy = UniformSampleDiskConcentric(hash);
+        L.z = sqrt(1 - dot(L.xy, L.xy));
+
+        float3 Ray_Dir_WS = TangentToWorld(L, float4(worldNormal, 1.0));
+        float3 Ray_Dir_VS = mul((float3x3) (_SSGI_ProjMatrix), Ray_Dir_WS);
 
         float jitter = hash.x + hash.y;
 
-        // bool hit = Linear2D_Trace(_CameraDepthTexture, rayOrigin, reflectionDir, _SSGI_ProjMatrix, _SSGI_BufferSize, jitter, _SSGI_RaySteps, _SSGI_Thickness, _SSGI_TraceDistance, Ray_HitUV, _SSGI_RayStepSize, _SSGI_TraceBehind == 1, Ray_HitPoint, Ray_NumMarch);
+        float2 hitUV;
+        int stepSize;
+        bool SSGI_TraceBehind = false;
+        float3 csHitPoint;
+        float stepCount;
+        
+        bool hit = Linear2D_Trace(_CameraDepthTexture, sampler_linear_clamp, rayOrigin, Ray_Dir_VS, _SSGI_ProjMatrix,
+        _SSGI_BufferSize.xy, jitter, _Linear_MaxRaySteps, _SSGI_Thickness,
+        _Linear_RayTraceMaxDistance, hitUV, _Linear_RayStepSize, SSGI_TraceBehind == 1, csHitPoint, stepCount);
+
+        // hitUV *= _SSGI_BufferSize.zw;
+
+        float3 sampleColor = SAMPLE_TEXTURE2D_LOD(_SSGI_SceneColor_RT, sampler_linear_clamp, hitUV, 0).rgb;
+        float3 sampleNormal = UnpackNormal(_GBuffer2.SampleLevel(sampler_linear_clamp, hitUV, 0).xyz);
+
+        // _SSGI_Out_ColorMask[id.xy] = float4(hit == 1, 0.0, 0.0, 1.0);
+        _SSGI_Out_ColorMask[id.xy] = float4(rayOrigin, 1.0);
+        _SSGI_Out_ColorMask[id.xy] = float4(Ray_Dir_VS, 1.0);
+        // _SSGI_Out_ColorMask[id.xy] = float4(hitUV, 0.0, 1.0);
+        _SSGI_Out_ColorMask[id.xy] = float4(sampleColor, 1.0);
+        // _SSGI_Out_ColorMask[id.xy] = float4(sampleNormal, 1.0);
 
     }
-
-    _SSGI_Out_ColorMask[id.xy] = float4(finalColor, 1.0);
 }
 
 
 
 [numthreads(8, 8, 1)]
-void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
+void SSGI_RayTracing_Hiz(uint3 id : SV_DispatchThreadID)
 {
     float2 resolution = _SSGI_BufferSize.xy;
     float2 invResolution = _SSGI_BufferSize.zw;
@@ -176,11 +212,11 @@ void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
         float3 rayStart = float3(uv, depth);
         float4 rayProj = mul(_SSGI_ProjMatrix, float4(viewPos + reflectionDir, 1.0));
         float3 rayDir = normalize((rayProj.xyz / rayProj.w) - NDCPos.xyz);
-        rayDir.xy *= float2(0.5f, -0.5f);
+        rayDir.xy *= float2(0.5f, 0.5f);
 
         float4 RayHitData = Hierarchical_Z_Trace(
             _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-            _SSGI_MaxRaySteps, _SSGI_Thickness, resolution,
+            _Hiz_MaxRaySteps, _SSGI_Thickness, resolution,
             rayStart, rayDir, _SSGI_PyramidDepth_RT
         );
 
@@ -272,7 +308,7 @@ void SSGI_RayTracing_(uint3 id : SV_DispatchThreadID)
     //     int hit, isSky;
     //     bool reflectSky = false;
     //     float3 RayHitData = hiZTrace(_Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-    //     rayStart, rayDir, _SSGI_MaxRaySteps, resolution,
+    //     rayStart, rayDir, _Hiz_MaxRaySteps, resolution,
     //     _SSGI_PyramidDepth_RT, sampler_bilinear_clamp, reflectSky,
     //     hit, isSky);
 
@@ -303,10 +339,28 @@ void SSGI_RayTracing_(uint3 id : SV_DispatchThreadID)
 
 }
 
+Texture2D _SSGI_PrevTexture;
+Texture2D _SSGI_CurrTexture;
+RWTexture2D<float4> _SSGI_Out_CurrTexture;
+
+
+[numthreads(8, 8, 1)]
+void SSGI_Temporal(uint3 id : SV_DispatchThreadID)
+{
+    float2 resolution = _SSGI_BufferSize.xy;
+    float2 invResolution = _SSGI_BufferSize.zw;
+    float2 uv = (id.xy + _SSGI_Jitter) * invResolution;
+    
+    float3 prevColor = _SSGI_PrevTexture.SampleLevel(sampler_bilinear_clamp, uv, 0).rgb;
+    float3 currColor = _SSGI_CurrTexture.SampleLevel(sampler_bilinear_clamp, uv, 0).rgb;
+    
+    _SSGI_Out_CurrTexture[id.xy] = float4(lerp(currColor, prevColor, _SSGI_TemporalWeight), 1.0);
+}
+
+
 #pragma kernel SSGI_Combine
 
 Texture2D<float4> _SSGI_ColorMask;
-
 RWTexture2D<float4> _SSGI_Out_Combine;
 
 
