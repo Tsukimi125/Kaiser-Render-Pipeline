@@ -1,0 +1,71 @@
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Deferred.hlsl"
+
+#include "../ShaderLibrary/KaiserRayTracing.hlsl"
+
+RaytracingAccelerationStructure _RaytracingAccelerationStructure;
+RWTexture2D<float4> RTR_UVWPDF;
+
+float4 RTR_TraceResolution;
+
+TEXTURE2D_X(_CameraDepthTexture);
+TEXTURE2D_X_HALF(_GBuffer0);
+TEXTURE2D_X_HALF(_GBuffer1);
+TEXTURE2D_X_HALF(_GBuffer2);
+
+SAMPLER(sampler_linear_clamp);
+
+#pragma max_recursion_depth 1
+
+[shader("raygeneration")]
+void Refelction_RayGen()
+{
+    uint2 dispatchIdx = DispatchRaysIndex().xy;
+    uint2 launchDim = DispatchRaysDimensions().xy;
+    float2 uv = dispatchIdx * RTR_TraceResolution.zw;
+
+    float depth = _CameraDepthTexture.SampleLevel(sampler_linear_clamp, uv, 0.0f).r;
+    if (depth <= 1e-7)
+    {
+        RTR_UVWPDF[dispatchIdx] = 0;
+        return;
+    }
+
+    float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
+    half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
+    float3 worldNormal = UnpackNormal(gbuffer2.xyz);
+    float3 viewNormal = TransformWorldToViewNormal(worldNormal);
+
+    float4 NDCPos = ComputeClipSpacePosition(uv, depth);
+    float3 worldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
+    float3 viewPos = ComputeViewSpacePosition(uv, depth, UNITY_MATRIX_I_P);
+    viewPos.z = -viewPos.z;
+
+    float3 viewDirWS = normalize(worldPos - GetCameraPositionWS());
+
+    float3 reflectionDir = reflect(viewDirWS, worldNormal);
+
+    RayDesc rayDescriptor;
+    // RayDescriptorAO.Origin = GetCameraPositionWS();
+    rayDescriptor.Origin = worldPos - 1e-4 * worldNormal;
+    rayDescriptor.Direction = reflectionDir;
+    rayDescriptor.TMin = 0;
+    rayDescriptor.TMax = 400;
+
+    RayIntersection rayIntersection;
+    rayIntersection.albedo = float3(1.0, 0.0, 0.0);
+    rayIntersection.normal = float3(0.0, 1.0, 0.0);
+
+    TraceRay(_RaytracingAccelerationStructure, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0, 1, 0, rayDescriptor, rayIntersection);
+
+    RTR_UVWPDF[dispatchIdx] = float4(rayIntersection.albedo, 1.0);
+}
+
+[shader("closesthit")]
+void ClosestHit(inout RayIntersection intersection : SV_RayPayload, AttributeData attributeData : SV_IntersectionAttributes)
+{
+    intersection.albedo = float3(1, 0, 0);
+    intersection.normal = attributeData.Normal;
+}
