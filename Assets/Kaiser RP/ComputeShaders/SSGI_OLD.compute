@@ -34,7 +34,7 @@ float4x4 _SSGI_InvViewProjMatrix;
 int _Hiz_MaxLevel;
 int _Hiz_StartLevel;
 int _Hiz_StopLevel;
-int _Hiz_RaySteps;
+int _SSR_MaxRaySteps;
 
 Texture2D _SSGI_PyramidDepth_RT;
 
@@ -103,7 +103,7 @@ void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
 
         float4 RayHitData = Hierarchical_Z_Trace(
             _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-            _Hiz_RaySteps, _SSGI_Thickness, resolution,
+            _SSR_MaxRaySteps, _SSGI_Thickness, resolution,
             rayStart, rayDir, _SSGI_PyramidDepth_RT
         );
 
@@ -117,6 +117,7 @@ void SSGI_RayTracing(uint3 id : SV_DispatchThreadID)
 
         Out_ColorMask += float4(sampleColor, mask * mask);
         // _SSGI_Out_ColorMask_RT[id.xy] = mask;
+
     }
     Out_ColorMask.rgb /= _SSGI_CastRayCount;
     Out_ColorMask.rgb *= rcp(1 - Luminance(Out_ColorMask.rgb));

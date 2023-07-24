@@ -113,7 +113,7 @@ public class StochasticSSRRenderPass : ScriptableRenderPass
         cmd.SetComputeIntParam(settings.computeShader, "_Hiz_MaxLevel", settings.Hiz_MaxLevel);
         cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StartLevel", settings.Hiz_StartLevel);
         cmd.SetComputeIntParam(settings.computeShader, "_Hiz_StopLevel", settings.Hiz_StopLevel);
-        cmd.SetComputeIntParam(settings.computeShader, "_Hiz_RaySteps", settings.Hiz_RaySteps);
+        cmd.SetComputeIntParam(settings.computeShader, "_SSR_MaxRaySteps", settings.Hiz_RaySteps);
     }
 
     void ReleaseTemporaryRT(CommandBuffer cmd)
