@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a62d94edd4db7c94bab8e4717093e483, type: 3}
   m_Name: PyramidDepth
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     computeShader: {fileID: 7200000, guid: 3923aa8f3198eea49acead9f17de170b, type: 3}
     mipCount: 10
     debugEnabled: 1
     debugMip: 0
---- !u!114 &-6826457083240020768
+--- !u!114 &-4765218974072586445
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -36,9 +36,9 @@ MonoBehaviour:
     computeShader: {fileID: 7200000, guid: 13a79d6cf36d27141a47b7bd78c640ca, type: 3}
     blueNoiseTexture: {fileID: 2800000, guid: 42e89995493f8e74c8544bc0b78ee376, type: 3}
     aoType: 1
-    intensity: 1
-    aoRadius: 4
-    maxDistance: 4
+    intensity: 1.25
+    aoRadius: 8
+    maxDistance: 8.8
     directionCount: 6
     sampleCount: 6
 --- !u!114 &-3915427986871945859
@@ -100,10 +100,10 @@ MonoBehaviour:
   - {fileID: -8728689468173685117}
   - {fileID: -3915427986871945859}
   - {fileID: 4950715434165271513}
-  - {fileID: -6826457083240020768}
   - {fileID: 1364262315553016516}
   - {fileID: -3422027129666777177}
-  m_RendererFeatureMap: 836ed0de2c77dd867df5dfa2fd9aa9c9d9fb76157579b444e084076f738d43a1c44afd0a59d5ee12a74f76cc748482d0
+  - {fileID: -4765218974072586445}
+  m_RendererFeatureMap: 836ed0de2c77dd867df5dfa2fd9aa9c9d9fb76157579b444c44afd0a59d5ee12a74f76cc748482d033bf731d978adebd
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}

@@ -6,8 +6,6 @@ float Hash(float2 p)
     return frac(sin(dot(p, float2(1.9, 7.2))) * 4.5);
 }
 
-
-
 float3 MinDiff(float3 p, float3 p1, float3 p2)
 {
     float3 v1 = p1 - p;

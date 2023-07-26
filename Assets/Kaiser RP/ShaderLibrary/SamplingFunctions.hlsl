@@ -11,8 +11,6 @@ float2 Hammersley16(uint Index, uint NumSamples, uint2 Random)
 }
 
 
-
-
 float2 UniformSampleDiskConcentric(float2 E)
 {
     float2 p = 2 * E - 1;
