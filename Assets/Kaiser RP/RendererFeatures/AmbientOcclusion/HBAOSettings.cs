@@ -14,12 +14,17 @@ public class HBAOSettings
 
     public enum AOType
     {
-        SSAO,
-        HBAO
+        HBAO,
+        GTAO
+    }
+
+    public enum Resolution
+    {
+        Half,
+        Full
     }
 
     public AOType aoType = AOType.HBAO;
-
     [Range(0f, 5f)] public float intensity;
     [Range(0f, 10f)] public float radius;
     [Range(4, 512)] public float sampleNums;

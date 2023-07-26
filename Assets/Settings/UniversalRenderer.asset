@@ -18,6 +18,29 @@ MonoBehaviour:
     mipCount: 10
     debugEnabled: 1
     debugMip: 0
+--- !u!114 &-6826457083240020768
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 383388d925bbc7645bdf98a5c98a8dae, type: 3}
+  m_Name: KaiserAmbientOcclusion
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  settings:
+    passEvent: 550
+    computeShader: {fileID: 7200000, guid: 13a79d6cf36d27141a47b7bd78c640ca, type: 3}
+    blueNoiseTexture: {fileID: 2800000, guid: 42e89995493f8e74c8544bc0b78ee376, type: 3}
+    aoType: 1
+    intensity: 1
+    aoRadius: 4
+    maxDistance: 4
+    directionCount: 6
+    sampleCount: 6
 --- !u!114 &-3915427986871945859
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -38,7 +61,7 @@ MonoBehaviour:
     Hiz_MaxLevel: 10
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
-    Hiz_RaySteps: 98
+    Hiz_RaySteps: 64
     Spatial_Resolve: 4
     Temporal_Weight: 0.99
     Temporal_Scale: 1.4
@@ -54,7 +77,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5702f6792e1da6f4c9f34f37285e8523, type: 3}
   m_Name: TAA
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   quality: 0
   jitterIntensity: 1
   blend: 0.04
@@ -77,9 +100,10 @@ MonoBehaviour:
   - {fileID: -8728689468173685117}
   - {fileID: -3915427986871945859}
   - {fileID: 4950715434165271513}
+  - {fileID: -6826457083240020768}
   - {fileID: 1364262315553016516}
   - {fileID: -3422027129666777177}
-  m_RendererFeatureMap: 836ed0de2c77dd867df5dfa2fd9aa9c9d9fb76157579b444c44afd0a59d5ee12a74f76cc748482d0
+  m_RendererFeatureMap: 836ed0de2c77dd867df5dfa2fd9aa9c9d9fb76157579b444e084076f738d43a1c44afd0a59d5ee12a74f76cc748482d0
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}

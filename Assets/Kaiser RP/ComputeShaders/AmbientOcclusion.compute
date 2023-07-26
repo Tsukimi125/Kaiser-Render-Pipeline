@@ -1,9 +1,13 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel HBAO
+#pragma kernel GTAO
+#pragma kernel AO_Combine
 
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
+
+#include "../ShaderLibrary/KaiserAO.hlsl"
 
 // #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 // #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareNormalsTexture.hlsl"
@@ -32,26 +36,18 @@ SAMPLER(sampler_point_repeat);
 SAMPLER(sampler_linear_clamp);
 SAMPLER(sampler_linear_repeat);
 
-float4x4 _CameraProjectionMatrix;
-float4x4 _CameraInverseProjectionMatrix;
+float4x4 _AO_ProjectionMatrix;
+float4x4 _AO_InverseProjectionMatrix;
 
 
 float _AngleBias = 0.1f * PI;
 // float _MaxRadiusPixels = 256.0;
 
-float Hash(float2 p)
-{
-    return frac(sin(dot(p, float2(1.9, 7.2))) * 4.5);
-}
-
 float3 TransformScreenUVToViewSpcae(float2 uv, float linear01Depth)
 {
-    //calculate camera to far plane ray in the screen
     float4 cameraFarPlaneRay = float4(uv * 2.0 - 1.0, 1.0, 1.0);
-    cameraFarPlaneRay = mul(_CameraInverseProjectionMatrix, cameraFarPlaneRay);
+    cameraFarPlaneRay = mul(_AO_InverseProjectionMatrix, cameraFarPlaneRay);
     cameraFarPlaneRay.xyz = cameraFarPlaneRay.xyz;
-    // cameraFarPlaneRay.xyz = cameraFarPlaneRay.xyz / cameraFarPlaneRay.w;
-    //linear depth 0-1
     return cameraFarPlaneRay.xyz * linear01Depth;
 }
 
@@ -62,56 +58,19 @@ float SampleLinear01Depth(float2 uv)
 
 float3 SampleTangetFromView(float2 uv, float2 dir, float2 invBufferSize, float linear01Depth)
 {
-    // float3 tangent = 
+    // float3 tangent =
     //     TransformScreenUVToViewSpcae(uv + dir * invBufferSize, linear01Depth) -
     //     TransformScreenUVToViewSpcae(uv - dir * invBufferSize, linear01Depth);
-    float3 tangent = 
-    TransformScreenUVToViewSpcae(uv + dir * invBufferSize, linear01Depth) -
+    float3 tangent = TransformScreenUVToViewSpcae(uv + dir * invBufferSize, linear01Depth) -
     TransformScreenUVToViewSpcae(uv - dir * invBufferSize, linear01Depth);
     tangent = normalize(tangent);
     
     return tangent;
 }
 
-float3 MinDiff(float3 p, float3 p1, float3 p2)
-{
-    float3 v1 = p1 - p;
-    float3 v2 = p - p2;
-    return (length(v1) < length(v2)) ? v1 : v2;
-}
-
-float FallOff(float dist)
-{
-    return saturate(1 - (dist * dist / (_Radius * _Radius))); // if dist >= _Radius saturate(FallOff(dist))=0 ao=0
-}
-
-float GetTan(float3 v)
-{
-    return v.z * rsqrt(dot(v.xy, v.xy));
-}
-
-float TanToSin(float x)
-{
-    return x * rsqrt(x * x + 1.0);
-}
-
-float2 RotateDirections(float2 dir, float2 CosSin)
-{
-    return float2(
-        dir.x * CosSin.x - dir.y * CosSin.y,
-        dir.x * CosSin.y + dir.y * CosSin.x
-    );
-}
-
-float2 SnapUVOffset(float2 uv, float2 bufferSize, float2 invBufferSize)
-{
-    return round(uv * bufferSize) * invBufferSize;
-}
-
-[numthreads(8,8,1)]
+[numthreads(8, 8, 1)]
 void HBAO(uint3 id : SV_DispatchThreadID)
-{   
-    
+{
     // screen info
     float2 bufferSize = _BufferSize.xy;
     float2 invBufferSize = _BufferSize.zw;
@@ -152,7 +111,6 @@ void HBAO(uint3 id : SV_DispatchThreadID)
     // Random (Blue Noise)
     float3 rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV, 0));
     rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV + rand.xy, 0));
-
 
     float radiusPixel = 0.5f * _Radius * 0.3f * _BufferSize.x / linearDepth;
     int _MaxRadiusPixels = 256;
@@ -209,10 +167,12 @@ void HBAO(uint3 id : SV_DispatchThreadID)
 
                 // float sinH = TanToSin(tanH);
 
-                if (dist < _Radius) {
+                if (dist < _Radius)
+                {
                     float sinH = TanToSin(tanH);
-                    ao += FallOff(dist) * (saturate(sinH) - saturate(sinT));
+                    ao += FallOff(dist, _Radius) * (saturate(sinH) - saturate(sinT));
                     // ao += (sinH - sinT) * FallOff(dist);
+
                 }
 
                 // if (dist < _Radius && tanH > tanT) {
@@ -231,8 +191,21 @@ void HBAO(uint3 id : SV_DispatchThreadID)
                 //     tanT = tanH;
                 //     sinT = sinH;
                 // }
+
             }
         }
     }
     AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
+}
+
+[numthreads(8, 8, 1)]
+void GTAO(uint3 id : SV_DispatchThreadID)
+{
+
+}
+
+[numthreads(8, 8, 1)]
+void AO_Combine(uint3 id : SV_DispatchThreadID)
+{
+
 }

@@ -42,11 +42,11 @@ public class StochasticSSRRenderPass : ScriptableRenderPass
         this.renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
         profilingSampler = new ProfilingSampler("[Kaiser] SSSR");
     }
-    private RandomSampler randomSampler;
+    private RandomSampler randomSampler = new RandomSampler(0, 64);
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
         ConfigureInput(ScriptableRenderPassInput.Depth | ScriptableRenderPassInput.Normal);
-        randomSampler = new RandomSampler(0, 64);
+        // randomSampler = new RandomSampler(0, 64);
     }
 
 

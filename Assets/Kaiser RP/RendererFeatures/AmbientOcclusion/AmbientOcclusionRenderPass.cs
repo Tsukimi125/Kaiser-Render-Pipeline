@@ -36,16 +36,11 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
                 width, height, RenderTextureFormat.Default, 0, 0);
             descriptor.sRGB = false;
             descriptor.enableRandomWrite = true;
-            // cmd.GetTemporaryRT(aoRTId, width, height, 0, FilterMode.Bilinear, RenderTextureFormat.R8, RenderTextureReadWrite.Default);
-
-            // cmd.SetComputeFloatParam(settings.computeShader, "_Intensity", settings.intensity);
-
-
 
             Matrix4x4 projectionMatrix = renderingData.cameraData.GetProjectionMatrix();
             cmd.SetComputeVectorParam(settings.computeShader, "_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
-            cmd.SetComputeMatrixParam(settings.computeShader, "_CameraProjectionMatrix", projectionMatrix);
-            cmd.SetComputeMatrixParam(settings.computeShader, "_CameraInverseProjectionMatrix", projectionMatrix.inverse);
+            cmd.SetComputeMatrixParam(settings.computeShader, "_AO_ProjectionMatrix", projectionMatrix);
+            cmd.SetComputeMatrixParam(settings.computeShader, "_AO_InverseProjectionMatrix", projectionMatrix.inverse);
 
             cmd.SetComputeFloatParam(settings.computeShader, "_Intensity", settings.intensity);
             cmd.SetComputeFloatParam(settings.computeShader, "_Radius", settings.aoRadius);
