@@ -30,7 +30,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 383388d925bbc7645bdf98a5c98a8dae, type: 3}
   m_Name: KaiserAmbientOcclusion
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     passEvent: 550
     computeShader: {fileID: 7200000, guid: 13a79d6cf36d27141a47b7bd78c640ca, type: 3}
