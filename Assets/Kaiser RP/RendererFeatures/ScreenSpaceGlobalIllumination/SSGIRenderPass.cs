@@ -19,6 +19,9 @@ public class SSGIRenderPass : ScriptableRenderPass
     private static class SSGI_OutputIDs
     {
 
+        public static int PrevTexture = Shader.PropertyToID("_SSGI_PrevTexture");
+        public static int CurrTexture = Shader.PropertyToID("_SSGI_CurrTexture");
+        public static int OutCurrTexture = Shader.PropertyToID("_SSGI_Out_CurrTexture");
         public static int ColorMask = Shader.PropertyToID("_SSGI_Out_ColorMask");
         public static int Combine = Shader.PropertyToID("_SSGI_Out_Combine");
     }
@@ -89,7 +92,9 @@ public class SSGIRenderPass : ScriptableRenderPass
         descriptorR8.enableRandomWrite = true;
 
         cmd.GetTemporaryRT(SSGI_InputIDs.SceneColor, descriptorDefault);
-
+        cmd.GetTemporaryRT(SSGI_OutputIDs.PrevTexture, descriptorDefault);
+        cmd.GetTemporaryRT(SSGI_OutputIDs.CurrTexture, descriptorDefault);
+        cmd.GetTemporaryRT(SSGI_OutputIDs.OutCurrTexture, descriptorDefault);
         cmd.GetTemporaryRT(SSGI_OutputIDs.ColorMask, descriptorDefault);
         cmd.GetTemporaryRT(SSGI_OutputIDs.Combine, descriptorDefault);
 
@@ -139,7 +144,7 @@ public class SSGIRenderPass : ScriptableRenderPass
             k1 = settings.computeShader.FindKernel("SSGI_RayTracing_Hiz");
         }
 
-
+        int k2 = settings.computeShader.FindKernel("SSGI_Temporal");
         int k4 = settings.computeShader.FindKernel("SSGI_Combine");
 
         using (new ProfilingScope(cmd, profilingSampler))
@@ -160,7 +165,7 @@ public class SSGIRenderPass : ScriptableRenderPass
                 cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_SceneColor_RT", SSGI_InputIDs.SceneColor);
                 cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_PyramidDepth_RT", SSGI_InputIDs.PyramidDepth);
 
-                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_Out_ColorMask", SSGI_OutputIDs.ColorMask);
+                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSGI_Out_ColorMask", SSGI_OutputIDs.CurrTexture);
 
                 // Dispatch
                 cmd.DispatchCompute(settings.computeShader, k1, width / 8, height / 8, 1);
@@ -175,14 +180,20 @@ public class SSGIRenderPass : ScriptableRenderPass
 
             cmd.BeginSample("Temporal Filter");
             {
+                cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSGI_PrevTexture", SSGI_OutputIDs.PrevTexture);
+                cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSGI_CurrTexture", SSGI_OutputIDs.CurrTexture);
+                cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSGI_Out_CurrTexture", SSGI_OutputIDs.OutCurrTexture);
+                cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_TemporalWeight", settings.Temporal_Weight);
+                cmd.DispatchCompute(settings.computeShader, k2, width / 8, height / 8, 1);
 
+                cmd.CopyTexture(SSGI_OutputIDs.OutCurrTexture, SSGI_OutputIDs.PrevTexture);
             }
             cmd.EndSample("Temporal Filter");
 
             cmd.BeginSample("Combine");
             {
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_SceneColor_RT", SSGI_InputIDs.SceneColor);
-                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_ColorMask", SSGI_OutputIDs.ColorMask);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_ColorMask", SSGI_OutputIDs.OutCurrTexture);
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_Out_Combine", SSGI_OutputIDs.Combine);
                 cmd.DispatchCompute(settings.computeShader, k4, width / 8, height / 8, 1);
             }
@@ -190,7 +201,7 @@ public class SSGIRenderPass : ScriptableRenderPass
 
             if (settings.Debug_ColorMask)
             {
-                cmd.Blit(SSGI_OutputIDs.ColorMask, renderingData.cameraData.renderer.cameraColorTargetHandle);
+                cmd.Blit(SSGI_OutputIDs.OutCurrTexture, renderingData.cameraData.renderer.cameraColorTargetHandle);
             }
             else
             {

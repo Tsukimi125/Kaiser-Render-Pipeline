@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a62d94edd4db7c94bab8e4717093e483, type: 3}
   m_Name: PyramidDepth
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   settings:
     computeShader: {fileID: 7200000, guid: 3923aa8f3198eea49acead9f17de170b, type: 3}
     mipCount: 10
-    debugEnabled: 1
+    debugEnabled: 0
     debugMip: 0
 --- !u!114 &-4765218974072586445
 MonoBehaviour:
@@ -170,7 +170,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 493b06aab3c94a544b945b668447f395, type: 3}
   m_Name: KaiserSSGI
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   settings:
     computeShader: {fileID: 7200000, guid: 713a486e6bec305438e4e4b1c40497d4, type: 3}
     SSGI_CastRayCount: 1
@@ -186,6 +186,6 @@ MonoBehaviour:
     Hiz_StopLevel: 0
     SSGI_MaxRaySteps: 64
     Spatial_Resolve: 9
-    Temporal_Weight: 0.97
-    Temporal_Scale: 1.2
+    Temporal_Weight: 0.911
+    Temporal_Scale: 1
     Debug_ColorMask: 0
