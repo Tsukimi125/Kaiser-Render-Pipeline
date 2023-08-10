@@ -46,8 +46,8 @@ public class SSGISettings
     public int SSGI_MaxRaySteps = 64;
 
     [Header("Filtering")]
-    [Range(0, 10)]
-    public int Spatial_Resolve = 9;
+    [Range(0, 40)]
+    public float BilateralFilterRadius = 12.0f;
     [Range(0, 0.99f)]
     [SerializeField]
     public float Temporal_Weight = 0.98f;

@@ -19,7 +19,7 @@ Shader"Hidden/Universal Render Pipeline/TAAShader"
     TEXTURE2D_X_FLOAT(_CameraDepthTexture);
     uniform float4 _CameraDepthTexture_TexelSize;
     TEXTURE2D_X(_CameraMotionVectorsTexture);
-    float4x4 _Preview_VP;
+    float4x4 matrixWorldInverse;
     float4x4 _Inv_view_jittered;
     float4x4 _Inv_proj_jittered;
     float4 _Jitter_Blend;

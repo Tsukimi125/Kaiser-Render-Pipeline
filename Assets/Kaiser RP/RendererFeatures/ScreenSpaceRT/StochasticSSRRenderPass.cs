@@ -57,11 +57,13 @@ public class StochasticSSRRenderPass : ScriptableRenderPass
         SSR_Matrix.InvViewProj = camera.cameraToWorldMatrix *
             GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
         SSR_Matrix.ViewProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
+        SSR_Matrix.View = camera.worldToCameraMatrix;
 
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjMatrix", SSR_Matrix.Proj);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvProjMatrix", SSR_Matrix.InvProj);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewProjMatrix", SSR_Matrix.InvViewProj);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ViewProjMatrix", SSR_Matrix.ViewProj);
+        cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ViewMatrix", SSR_Matrix.View);
     }
 
     void UpdatePreviousTransformMatrix(CommandBuffer cmd, Camera camera)

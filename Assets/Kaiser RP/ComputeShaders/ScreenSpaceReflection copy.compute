@@ -35,7 +35,6 @@ SAMPLER(sampler_bilinear_clamp);
 
 float4 _SSR_BufferSize;
 
-float4x4 _SSR_ViewMatrix;
 float4x4 _SSR_ProjMatrix;
 float4x4 _SSR_InvProjMatrix;
 float4x4 _SSR_InvViewProjMatrix;
@@ -74,45 +73,41 @@ void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
     float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
     half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
     float3 worldNormal = UnpackNormal(gbuffer2.xyz);
+    // float3 viewNormal = mul(UNITY_MATRIX_V, float4(worldNormal, 1.0)).xyz;
     float3 viewNormal = TransformWorldToViewNormal(worldNormal);
 
     float4 NDCPos = ComputeClipSpacePosition(uv, depth);
-    // NDCPos.y *= -1;
-    // _SSR_Out_ColorMask[id.xy] = float4(uv,0.0, 1.0);return;
-    float4 viewPos = mul(_SSR_InvProjMatrix, NDCPos);
-    viewPos.xyz /= viewPos.w;
-    
     float3 worldPos = ComputeWorldSpacePosition(uv, depth, _SSR_InvViewProjMatrix);
-    float3 viewDir = normalize(worldPos - _WorldSpaceCameraPos);
-    float3 reflectionDirWS = reflect(viewDir, worldNormal);
-    float3 reflectionDirVS = mul(_SSR_ViewMatrix, float4(reflectionDirWS, 0.0)).xyz;
+    float3 viewPos = ComputeViewSpacePosition(uv, depth, _SSR_InvProjMatrix);
+    // float3 worldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
+    // float3 viewPos = ComputeViewSpacePosition(uv, depth, UNITY_MATRIX_I_P);
+    viewPos.z = -viewPos.z;
 
-
-
+    // rand gen
     uint frameIDMod8 = uint(fmod(_SSR_FrameIndex, 8));
     uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
     float2 hash = Hammersley16(0, (uint)1, random);
-    hash.y = lerp(hash.y, 0, BRDF_BIAS);
+    // hash.y = lerp(hash.y, 0, BRDF_BIAS);
 
     float4 H = float4(0, 0, 0, 0);
     if (roughness > 0.1)
     {
-        // H = TangentToWorld(ImportanceSampleGGX(hash, roughness).xyz, float4(worldNormal, 1.0));
-        
+        H = TangentToWorld(ImportanceSampleGGX(hash, roughness).xyz, float4(viewNormal, 1.0));
+        H = float4(viewNormal, 1.0);
     }
     else
     {
-       
+        H = float4(viewNormal, 1.0);
     }
-    H = float4(worldNormal, 1.0);
-    float3 reflectionDir = reflect(normalize(worldPos - _WorldSpaceCameraPos), H.xyz);
-    reflectionDir = mul(UNITY_MATRIX_V, float4(reflectionDir, 0)).xyz;
+    float3 reflectionDir = reflect(normalize(viewPos), H.xyz);
+
 
     float3 rayStart = float3(uv, depth);
     float4 rayProj = mul(_SSR_ProjMatrix, float4(viewPos + reflectionDir, 1.0));
     float3 rayDir = normalize((rayProj.xyz / rayProj.w) - NDCPos.xyz);
     rayDir.xy *= float2(0.5f, -0.5f);
 
+    
     float4 RayHitData = Hierarchical_Z_Trace(
         _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
         _SSR_MaxRaySteps, _SSR_Thickness, resolution,

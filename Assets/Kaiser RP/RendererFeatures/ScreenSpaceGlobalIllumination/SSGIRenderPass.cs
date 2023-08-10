@@ -9,7 +9,6 @@ public class SSGIRenderPass : ScriptableRenderPass
     private SSGISettings settings; //基本参数
     private Material material; //材质
 
-
     private static class SSGI_InputIDs
     {
         public static int SceneColor = Shader.PropertyToID("_SSGI_SceneColor_RT");
@@ -22,6 +21,10 @@ public class SSGIRenderPass : ScriptableRenderPass
         public static int PrevTexture = Shader.PropertyToID("_SSGI_PrevTexture");
         public static int CurrTexture = Shader.PropertyToID("_SSGI_CurrTexture");
         public static int OutCurrTexture = Shader.PropertyToID("_SSGI_Out_CurrTexture");
+
+        public static int SpatialTexture = Shader.PropertyToID("_SSGI_SpatialTexture");
+        public static int SpatialSwapTexture = Shader.PropertyToID("_SSGI_SpatialTexture_Swap");
+
         public static int ColorMask = Shader.PropertyToID("_SSGI_Out_ColorMask");
         public static int Combine = Shader.PropertyToID("_SSGI_Out_Combine");
     }
@@ -47,7 +50,6 @@ public class SSGIRenderPass : ScriptableRenderPass
         ConfigureInput(ScriptableRenderPassInput.Depth | ScriptableRenderPassInput.Normal);
         // randomSampler = new RandomSampler(0, 64);
     }
-
 
     void UpdateTransformMatrix(CommandBuffer cmd, Camera camera, int width, int height)
     {
@@ -92,6 +94,10 @@ public class SSGIRenderPass : ScriptableRenderPass
         descriptorR8.enableRandomWrite = true;
 
         cmd.GetTemporaryRT(SSGI_InputIDs.SceneColor, descriptorDefault);
+
+        cmd.GetTemporaryRT(SSGI_OutputIDs.SpatialTexture, descriptorDefault);
+        cmd.GetTemporaryRT(SSGI_OutputIDs.SpatialSwapTexture, descriptorDefault);
+
         cmd.GetTemporaryRT(SSGI_OutputIDs.PrevTexture, descriptorDefault);
         cmd.GetTemporaryRT(SSGI_OutputIDs.CurrTexture, descriptorDefault);
         cmd.GetTemporaryRT(SSGI_OutputIDs.OutCurrTexture, descriptorDefault);
@@ -145,7 +151,9 @@ public class SSGIRenderPass : ScriptableRenderPass
         }
 
         int k2 = settings.computeShader.FindKernel("SSGI_Temporal");
-        int k4 = settings.computeShader.FindKernel("SSGI_Combine");
+        int k3 = settings.computeShader.FindKernel("SSGI_Bilateralfilter_X");
+        int k4 = settings.computeShader.FindKernel("SSGI_Bilateralfilter_Y");
+        int k5 = settings.computeShader.FindKernel("SSGI_Combine");
 
         using (new ProfilingScope(cmd, profilingSampler))
         {
@@ -174,16 +182,26 @@ public class SSGIRenderPass : ScriptableRenderPass
 
             cmd.BeginSample("Spatial Filter");
             {
+                cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_Spatial_Radius", settings.BilateralFilterRadius);
 
+                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSGI_SpatialTexture", SSGI_OutputIDs.CurrTexture);
+                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSGI_Out_SpatialTexture", SSGI_OutputIDs.SpatialSwapTexture);
+                cmd.DispatchCompute(settings.computeShader, k3, width / 8, height / 8, 1);
+
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_SpatialTexture", SSGI_OutputIDs.SpatialSwapTexture);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_Out_SpatialTexture", SSGI_OutputIDs.CurrTexture);
+                cmd.DispatchCompute(settings.computeShader, k4, width / 8, height / 8, 1);
             }
             cmd.EndSample("Spatial Filter");
 
             cmd.BeginSample("Temporal Filter");
             {
+                cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_TemporalWeight", settings.Temporal_Weight);
+
                 cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSGI_PrevTexture", SSGI_OutputIDs.PrevTexture);
                 cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSGI_CurrTexture", SSGI_OutputIDs.CurrTexture);
                 cmd.SetComputeTextureParam(settings.computeShader, k2, "_SSGI_Out_CurrTexture", SSGI_OutputIDs.OutCurrTexture);
-                cmd.SetComputeFloatParam(settings.computeShader, "_SSGI_TemporalWeight", settings.Temporal_Weight);
+
                 cmd.DispatchCompute(settings.computeShader, k2, width / 8, height / 8, 1);
 
                 cmd.CopyTexture(SSGI_OutputIDs.OutCurrTexture, SSGI_OutputIDs.PrevTexture);
@@ -192,10 +210,10 @@ public class SSGIRenderPass : ScriptableRenderPass
 
             cmd.BeginSample("Combine");
             {
-                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_SceneColor_RT", SSGI_InputIDs.SceneColor);
-                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_ColorMask", SSGI_OutputIDs.OutCurrTexture);
-                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSGI_Out_Combine", SSGI_OutputIDs.Combine);
-                cmd.DispatchCompute(settings.computeShader, k4, width / 8, height / 8, 1);
+                cmd.SetComputeTextureParam(settings.computeShader, k5, "_SSGI_SceneColor_RT", SSGI_InputIDs.SceneColor);
+                cmd.SetComputeTextureParam(settings.computeShader, k5, "_SSGI_ColorMask", SSGI_OutputIDs.OutCurrTexture);
+                cmd.SetComputeTextureParam(settings.computeShader, k5, "_SSGI_Out_Combine", SSGI_OutputIDs.Combine);
+                cmd.DispatchCompute(settings.computeShader, k5, width / 8, height / 8, 1);
             }
             cmd.EndSample("Combine");
 

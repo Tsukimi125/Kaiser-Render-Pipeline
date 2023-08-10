@@ -46,11 +46,13 @@ public class PyramidDepthRenderPass : ScriptableRenderPass
         {
             int2 bufferSize = new int2(renderingData.cameraData.cameraTargetDescriptor.width, renderingData.cameraData.cameraTargetDescriptor.height);
 
-            RenderTextureDescriptor descriptor = new RenderTextureDescriptor((int)bufferSize.x, (int)bufferSize.y, 0);
-            descriptor.colorFormat = RenderTextureFormat.RFloat;
-            descriptor.sRGB = false;
-            descriptor.useMipMap = true;
-            descriptor.autoGenerateMips = false;
+            RenderTextureDescriptor descriptor = new RenderTextureDescriptor((int)bufferSize.x, (int)bufferSize.y, 0)
+            {
+                colorFormat = RenderTextureFormat.RFloat,
+                sRGB = false,
+                useMipMap = true,
+                autoGenerateMips = false
+            };
 
             cmd.GetTemporaryRT(pyramidDepth_ID, descriptor);
 

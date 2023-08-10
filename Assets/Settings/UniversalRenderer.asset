@@ -53,16 +53,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6fc7468e3425a6d4bbca3ad5e81b82f1, type: 3}
   m_Name: StochasticSSR
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   settings:
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
-    SSR_Thickness: 0.159
-    SSR_ScreenFade: 0.027
+    SSR_Thickness: 0.114
+    SSR_ScreenFade: 0.03
     Hiz_MaxLevel: 10
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
-    Hiz_RaySteps: 64
-    Spatial_Resolve: 4
+    Hiz_RaySteps: 169
+    Spatial_Resolve: 0
     Temporal_Weight: 0.99
     Temporal_Scale: 1.4
 --- !u!114 &-3422027129666777177
@@ -175,8 +175,8 @@ MonoBehaviour:
     computeShader: {fileID: 7200000, guid: 713a486e6bec305438e4e4b1c40497d4, type: 3}
     SSGI_CastRayCount: 1
     SSGI_Intensity: 1
-    SSGI_Thickness: 0.702
-    SSGI_ScreenFade: 0.116
+    SSGI_Thickness: 0.847
+    SSGI_ScreenFade: 0.018
     SSGI_TraceType: 1
     Linear_RayStepSize: 0
     Linear_RayTraceMaxDistance: 0
@@ -184,8 +184,8 @@ MonoBehaviour:
     Hiz_MaxLevel: 10
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
-    SSGI_MaxRaySteps: 64
-    Spatial_Resolve: 9
-    Temporal_Weight: 0.911
+    SSGI_MaxRaySteps: 84
+    BilateralFilterRadius: 3
+    Temporal_Weight: 0.95
     Temporal_Scale: 1
     Debug_ColorMask: 0
