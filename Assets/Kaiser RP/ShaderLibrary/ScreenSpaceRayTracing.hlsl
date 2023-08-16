@@ -1,5 +1,5 @@
-#ifndef KAISER_SCREEN_SPACE_RAY_TRACING
-#define KAISER_SCREEN_SPACE_RAY_TRACING
+#ifndef KAISER_SCREEN_SPACE_RAY_TRACING_
+#define KAISER_SCREEN_SPACE_RAY_TRACING_
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "KaiserStandard.hlsl"
@@ -275,7 +275,7 @@ float minimum_depth_plane(float2 ray, float level, float2 cell_count, Texture2D 
 
 float4 Hierarchical_Z_Trace(int HiZ_Max_Level, int HiZ_Start_Level, int HiZ_Stop_Level, int NumSteps, float Thickness, float2 screenSize, float3 rayOrigin, float3 rayDir, Texture2D SceneDepth)
 {
-    HiZ_Max_Level = clamp(HiZ_Max_Level, 0.0, 7.0);
+    HiZ_Max_Level = clamp(HiZ_Max_Level, 0.0, 10.0);
     rayOrigin = half3(rayOrigin.x, rayOrigin.y, -rayOrigin.z); rayDir = half3(rayDir.x, rayDir.y, -rayDir.z);
 
     float level = HiZ_Start_Level; float3 ray = rayOrigin;

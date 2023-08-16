@@ -49,7 +49,7 @@ public class PyramidDepthRenderPass : ScriptableRenderPass
             RenderTextureDescriptor descriptor = new RenderTextureDescriptor((int)bufferSize.x, (int)bufferSize.y, 0)
             {
                 colorFormat = RenderTextureFormat.RFloat,
-                sRGB = false,
+                sRGB = true,
                 useMipMap = true,
                 autoGenerateMips = false
             };

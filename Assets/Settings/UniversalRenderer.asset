@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a62d94edd4db7c94bab8e4717093e483, type: 3}
   m_Name: PyramidDepth
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     computeShader: {fileID: 7200000, guid: 3923aa8f3198eea49acead9f17de170b, type: 3}
     mipCount: 10
@@ -36,6 +36,7 @@ MonoBehaviour:
     computeShader: {fileID: 7200000, guid: 13a79d6cf36d27141a47b7bd78c640ca, type: 3}
     blueNoiseTexture: {fileID: 2800000, guid: 42e89995493f8e74c8544bc0b78ee376, type: 3}
     aoType: 1
+    debugMode: 1
     intensity: 1.25
     aoRadius: 8
     maxDistance: 8.8
@@ -50,21 +51,22 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6fc7468e3425a6d4bbca3ad5e81b82f1, type: 3}
+  m_Script: {fileID: 11500000, guid: 1ea8758495c027f47856dde02833d097, type: 3}
   m_Name: StochasticSSR
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
     SSR_Thickness: 0.114
-    SSR_ScreenFade: 0.03
+    SSR_ScreenFade: 0.054
     Hiz_MaxLevel: 10
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
-    Hiz_RaySteps: 169
+    Hiz_RaySteps: 57
     Spatial_Resolve: 0
-    Temporal_Weight: 0.99
+    Temporal_Weight: 0.977
     Temporal_Scale: 1.4
+    debugMode: 1
 --- !u!114 &-3422027129666777177
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -77,7 +79,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5702f6792e1da6f4c9f34f37285e8523, type: 3}
   m_Name: TAA
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   quality: 0
   jitterIntensity: 1
   blend: 0.04
@@ -98,12 +100,13 @@ MonoBehaviour:
     hdrDebugViewPS: {fileID: 4800000, guid: 573620ae32aec764abd4d728906d2587, type: 3}
   m_RendererFeatures:
   - {fileID: -8728689468173685117}
+  - {fileID: 5800513726982105129}
   - {fileID: -3915427986871945859}
   - {fileID: 4950715434165271513}
   - {fileID: 1364262315553016516}
   - {fileID: -3422027129666777177}
   - {fileID: -4765218974072586445}
-  m_RendererFeatureMap: 836ed0de2c77dd867df5dfa2fd9aa9c9d9fb76157579b444c44afd0a59d5ee12a74f76cc748482d033bf731d978adebd
+  m_RendererFeatureMap: 836ed0de2c77dd8629a88b9380907f507df5dfa2fd9aa9c9d9fb76157579b444c44afd0a59d5ee12a74f76cc748482d033bf731d978adebd
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -170,7 +173,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 493b06aab3c94a544b945b668447f395, type: 3}
   m_Name: KaiserSSGI
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     computeShader: {fileID: 7200000, guid: 713a486e6bec305438e4e4b1c40497d4, type: 3}
     SSGI_CastRayCount: 1
@@ -184,8 +187,25 @@ MonoBehaviour:
     Hiz_MaxLevel: 10
     Hiz_StartLevel: 1
     Hiz_StopLevel: 0
-    SSGI_MaxRaySteps: 84
+    SSGI_MaxRaySteps: 125
     BilateralFilterRadius: 3
     Temporal_Weight: 0.95
     Temporal_Scale: 1
     Debug_ColorMask: 0
+--- !u!114 &5800513726982105129
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb3e38b1f92a80a4ab7c6f580f79f909, type: 3}
+  m_Name: DepthPyramid
+  m_EditorClassIdentifier: 
+  m_Active: 0
+  depthPyramidShader: {fileID: 7200000, guid: f8ae85bd90193b540a869c43502f1e62, type: 3}
+  settings:
+    ShowDebug: 0
+    DebugSlice: 0

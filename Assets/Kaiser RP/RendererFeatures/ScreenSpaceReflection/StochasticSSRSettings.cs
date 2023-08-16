@@ -35,4 +35,14 @@ public class StochasticSSRSettings
     [Range(1, 5)]
     [SerializeField]
     public float Temporal_Scale = 1.25f;
+
+    public enum DebugMode
+    {
+        None,
+        ColorMask,
+    }
+
+    [Header("Debug")]
+    public DebugMode debugMode = DebugMode.None;
+
 }

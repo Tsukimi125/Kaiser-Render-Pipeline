@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-public class KaiserSSRT : ScriptableRendererFeature
+public class KaiserSSR : ScriptableRendererFeature
 {
     public StochasticSSRRenderPass ssrtRenderPass;
     public StochasticSSRSettings settings = new StochasticSSRSettings();

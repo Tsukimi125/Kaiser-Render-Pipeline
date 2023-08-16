@@ -29,10 +29,12 @@ public class StochasticSSRRenderPass : ScriptableRenderPass
 
     private static class SSR_Matrix
     {
+        public static Matrix4x4 View;
+        public static Matrix4x4 InvView;
         public static Matrix4x4 Proj;
         public static Matrix4x4 InvProj;
-        public static Matrix4x4 InvViewProj;
         public static Matrix4x4 ViewProj;
+        public static Matrix4x4 InvViewProj;
         public static Matrix4x4 PrevViewProj;
     }
 
@@ -48,17 +50,23 @@ public class StochasticSSRRenderPass : ScriptableRenderPass
         ConfigureInput(ScriptableRenderPassInput.Depth | ScriptableRenderPassInput.Normal);
         // randomSampler = new RandomSampler(0, 64);
     }
-
-
-    void UpdateTransformMatrix(CommandBuffer cmd, Camera camera)
+    void UpdateTransformMatrix(CommandBuffer cmd, RenderingData renderingData)
     {
-        SSR_Matrix.Proj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false);
-        SSR_Matrix.InvProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
-        SSR_Matrix.InvViewProj = camera.cameraToWorldMatrix *
-            GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
-        SSR_Matrix.ViewProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
-        SSR_Matrix.View = camera.worldToCameraMatrix;
+        // SSR_Matrix.Proj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false);
+        // SSR_Matrix.InvProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
+        // SSR_Matrix.InvViewProj = camera.cameraToWorldMatrix *
+        //     GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
+        // SSR_Matrix.ViewProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
+        // SSR_Matrix.View = camera.worldToCameraMatrix;
+        SSR_Matrix.View = renderingData.cameraData.GetViewMatrix();
+        SSR_Matrix.InvView = SSR_Matrix.View.inverse;
+        SSR_Matrix.Proj = renderingData.cameraData.GetGPUProjectionMatrix();
+        SSR_Matrix.InvProj = SSR_Matrix.Proj.inverse;
+        SSR_Matrix.InvViewProj = SSR_Matrix.View.inverse * SSR_Matrix.InvProj;
+        SSR_Matrix.ViewProj = SSR_Matrix.Proj * SSR_Matrix.View;
 
+
+        cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewMatrix", SSR_Matrix.InvView);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_ProjMatrix", SSR_Matrix.Proj);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvProjMatrix", SSR_Matrix.InvProj);
         cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_InvViewProjMatrix", SSR_Matrix.InvViewProj);
@@ -129,11 +137,13 @@ public class StochasticSSRRenderPass : ScriptableRenderPass
         cmd.ReleaseTemporaryRT(SSR_OutputIDs.TemporalCurrTexture);
         cmd.ReleaseTemporaryRT(SSR_OutputIDs.Combine);
     }
+
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
         var cmd = CommandBufferPool.Get();
 
-        int k1 = settings.computeShader.FindKernel("SSR_RayTracing");
+        // int k1 = settings.computeShader.FindKernel("SSR_RayTracing_Hiz");
+        int k1 = settings.computeShader.FindKernel("SSR_RayTracing_RayMarching");
         int k2 = settings.computeShader.FindKernel("SSR_SpatialFilter");
         int k3 = settings.computeShader.FindKernel("SSR_TemporalFilter");
         int k4 = settings.computeShader.FindKernel("SSR_Combine");
@@ -145,7 +155,7 @@ public class StochasticSSRRenderPass : ScriptableRenderPass
 
             randomSampler.RefreshFrame();
 
-            UpdateTransformMatrix(cmd, renderingData.cameraData.camera);
+            UpdateTransformMatrix(cmd, renderingData);
             UpdateRenderTextures(cmd, width, height);
             UpdateParameters(cmd, width, height);
 
@@ -157,7 +167,7 @@ public class StochasticSSRRenderPass : ScriptableRenderPass
                 cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_PyramidDepth_RT", SSR_InputIDs.PyramidDepth);
 
                 // Init Output Texture
-                cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_UVWPdf", SSR_OutputIDs.UVWPdf);
+                // cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_UVWPdf", SSR_OutputIDs.UVWPdf);
                 cmd.SetComputeTextureParam(settings.computeShader, k1, "_SSR_Out_ColorMask", SSR_OutputIDs.ColorMask);
 
                 // Dispatch
@@ -177,14 +187,14 @@ public class StochasticSSRRenderPass : ScriptableRenderPass
 
             cmd.BeginSample("Temporal Filter");
             {
-                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_UVWPdf", SSR_OutputIDs.UVWPdf);
-                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_SpatialFilter", SSR_OutputIDs.TemporalCurrTexture);
-                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_Temporal_PrevTexture", SSR_OutputIDs.TemporalPrevTexture);
-                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_Temporal_CurrTexture", SSR_OutputIDs.TemporalCurrTexture);
-                cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_Out_TemporalFilter", SSR_OutputIDs.TemporalFilter);
-                cmd.DispatchCompute(settings.computeShader, k3, width / 8, height / 8, 1);
-                cmd.CopyTexture(SSR_OutputIDs.TemporalFilter, SSR_OutputIDs.TemporalCurrTexture);
-                cmd.CopyTexture(SSR_OutputIDs.TemporalCurrTexture, SSR_OutputIDs.TemporalPrevTexture);
+                // cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_UVWPdf", SSR_OutputIDs.UVWPdf);
+                // cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_SpatialFilter", SSR_OutputIDs.TemporalCurrTexture);
+                // cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_Temporal_PrevTexture", SSR_OutputIDs.TemporalPrevTexture);
+                // cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_Temporal_CurrTexture", SSR_OutputIDs.TemporalCurrTexture);
+                // cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_Out_TemporalFilter", SSR_OutputIDs.TemporalFilter);
+                // cmd.DispatchCompute(settings.computeShader, k3, width / 8, height / 8, 1);
+                // cmd.CopyTexture(SSR_OutputIDs.TemporalFilter, SSR_OutputIDs.TemporalCurrTexture);
+                // cmd.CopyTexture(SSR_OutputIDs.TemporalCurrTexture, SSR_OutputIDs.TemporalPrevTexture);
             }
             cmd.EndSample("Temporal Filter");
 
@@ -193,13 +203,20 @@ public class StochasticSSRRenderPass : ScriptableRenderPass
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_SceneColor_RT", SSR_InputIDs.SceneColor);
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_UVWPdf", SSR_OutputIDs.UVWPdf);
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_ColorMask", SSR_OutputIDs.ColorMask);
-                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_FinalColor", SSR_OutputIDs.TemporalCurrTexture);
+                cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_FinalColor", SSR_OutputIDs.SpatialFilter);
                 cmd.SetComputeTextureParam(settings.computeShader, k4, "_SSR_Out_Combine", SSR_OutputIDs.Combine);
                 cmd.DispatchCompute(settings.computeShader, k4, width / 8, height / 8, 1);
             }
             cmd.EndSample("Combine");
+            if (settings.debugMode == StochasticSSRSettings.DebugMode.ColorMask)
+            {
+                cmd.Blit(SSR_OutputIDs.ColorMask, renderingData.cameraData.renderer.cameraColorTargetHandle);
+            }
+            else
+            {
+                cmd.Blit(SSR_OutputIDs.Combine, renderingData.cameraData.renderer.cameraColorTargetHandle);
+            }
 
-            cmd.Blit(SSR_OutputIDs.Combine, renderingData.cameraData.renderer.cameraColorTargetHandle);
 
             ReleaseTemporaryRT(cmd);
         }

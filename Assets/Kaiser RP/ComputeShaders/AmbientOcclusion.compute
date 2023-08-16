@@ -209,7 +209,8 @@ void HBAO(uint3 id : SV_DispatchThreadID)
             }
         }
     }
-    AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
+    // AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
+    AmbientOcclusionRT[id.xy] = depth;
 }
 
 [numthreads(8, 8, 1)]

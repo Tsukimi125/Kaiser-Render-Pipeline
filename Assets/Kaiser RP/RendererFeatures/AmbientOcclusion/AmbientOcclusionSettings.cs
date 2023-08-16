@@ -18,9 +18,17 @@ public class AmbientOcclusionSettings
         HBAO
     }
 
+    public enum DebugMode
+    {
+        None,
+        ColorMask,
+    }
+
+
     public Texture2D blueNoiseTexture;
 
     public AOType aoType = AOType.HBAO;
+    public DebugMode debugMode = DebugMode.None;
 
     [Range(0f, 5f)] public float intensity;
     [Range(0f, 10f)] public float aoRadius;
