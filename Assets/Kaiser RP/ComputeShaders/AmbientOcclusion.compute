@@ -89,7 +89,7 @@ void HBAO(uint3 id:SV_DispatchThreadID)
     float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, screenUV, 0).r;
 
     [branch]
-    if (depth == 0.0f)
+    if (depth <= 0.01f)
     {
         AmbientOcclusionRT[id.xy] = float4(1.0, 1.0, 1.0, 1.0);
         return;
@@ -102,7 +102,7 @@ void HBAO(uint3 id:SV_DispatchThreadID)
     float3 positionVS = TransformScreenUVToViewSpcae(screenUV, linear01Depth);
     
 
-    float2 delta = invBufferSize * 2.20f;
+    float2 delta = invBufferSize * 1.2f;
 
     float3 positionLeftVS, positionRightVS, positionTopVS, positionBottonVS;
 
@@ -130,11 +130,11 @@ void HBAO(uint3 id:SV_DispatchThreadID)
     uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
     uint2 random_2 = Rand3DPCG16(uint3(pixelPosition, frameIDMod31)).xy;
     float2 rand2 = Hammersley16(frameIDMod8, 8, random);
-    float2 rand2_2 = Hammersley16(frameIDMod31, 8, random_2);
+    float2 rand2_2 = Hammersley16(frameIDMod31, 31, random_2);
     
     // Random (Blue Noise)
     float3 rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_clamp, screenUV, 0));
-    rand.xy = clamp(rand2_2, 0.01f, 0.09f);
+    rand.xy = clamp(rand2, 0.01f, 0.09f);
     // rand.z = rand2.x;
     // rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV + rand.xy, 0));
     // rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV + rand.xz, 0));
@@ -150,7 +150,8 @@ void HBAO(uint3 id:SV_DispatchThreadID)
     float stepSize = min(radiusPixel, _MaxRadiusPixels);
 
     float ao = 0.0;
-    
+    float dirCount = _DirectionCount;
+
     if (radiusPixel > 1.0f)
     {
         // TODO: prepare stage 2 : compute steps
@@ -168,13 +169,15 @@ void HBAO(uint3 id:SV_DispatchThreadID)
         
         float2 stepSizeUV = stepSizePix * _BufferSize.zw;
         float stepAngle = 2 * PI / _DirectionCount;
+        float startRandomAngle = rand2_2.x * stepAngle;
         
         // TODO: sample stage
+        
         
         [loop]
         for (int d = 0; d < _DirectionCount; d++)
         {
-            float angle = stepAngle * d;
+            float angle = startRandomAngle + stepAngle * d;
             float2 dir = RotateDirections(float2(cos(angle), sin(angle)), rand.xy);
             float2 deltaUV = dir * stepSizeUV * (0.75f.xx + 0.5f.xx * rand.xy);
 
@@ -188,7 +191,8 @@ void HBAO(uint3 id:SV_DispatchThreadID)
             float sinT = TanToSin(tanT);
             // AmbientOcclusionRT[id.xy] = sinT;
             // return;
-            
+
+            float dirAO = 0.0f;
             [loop]
             for (int s = 1; s <= _SampleCount; s++)
             {
@@ -198,7 +202,9 @@ void HBAO(uint3 id:SV_DispatchThreadID)
                 [branch]
                 if (sampleDepth == 0.0f)
                 {
-                    break;
+                    // dirAO = -1.0f;
+                    // break;
+                    sampleDepth = depth;
                 }
 
                 float sample01Depth = Linear01Depth(sampleDepth, _ZBufferParams);
@@ -209,18 +215,11 @@ void HBAO(uint3 id:SV_DispatchThreadID)
 
                 // float sinH = TanToSin(tanH);
 
-
-
                 [branch]
                 if (dist < _Radius)
                 {
                     float sinH = TanToSin(tanH);
-                    // ao += FallOff(dist, _Radius) * clamp(sinH - sinT, -1.0, 1.0);
-                    ao += FallOff(dist, _Radius) * (sinH - sinT);
-                    // ao += FallOff(dist, _Radius) * clamp(sinH, 0.0, 1.0);
-                    // ao += sinH;
-                    // ao += (sinH - sinT) * FallOff(dist, _Radius);
-
+                    dirAO += FallOff(dist, _Radius) * (sinH - sinT);
                 }
 
 
@@ -242,13 +241,14 @@ void HBAO(uint3 id:SV_DispatchThreadID)
                 // }
 
             }
+            ao += dirAO;
         }
     }
     // AmbientOcclusionRT[id.xy] = float4(positionVS, 0.0);
     // AmbientOcclusionRT[id.xy] = float4(rand.xy, 0.0, 0.0);
     // AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
     // AmbientOcclusionRT[id.xy] = ao;
-    AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
+    AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / dirCount;
 }
 
 [numthreads(8, 8, 1)]

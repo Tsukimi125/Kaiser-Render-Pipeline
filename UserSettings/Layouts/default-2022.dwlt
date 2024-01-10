@@ -19,7 +19,7 @@ MonoBehaviour:
     width: 2048
     height: 1068.8
   m_ShowMode: 4
-  m_Title: Project
+  m_Title: Hierarchy
   m_RootView: {fileID: 2}
   m_MinSize: {x: 875, y: 300}
   m_MaxSize: {x: 10000, y: 10000}
@@ -121,7 +121,7 @@ MonoBehaviour:
   m_MinSize: {x: 400, y: 100}
   m_MaxSize: {x: 32384, y: 16192}
   vertical: 0
-  controlID: 152
+  controlID: 50
 --- !u!114 &6
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -146,7 +146,7 @@ MonoBehaviour:
   m_MinSize: {x: 100, y: 100}
   m_MaxSize: {x: 8096, y: 16192}
   vertical: 1
-  controlID: 29
+  controlID: 27
 --- !u!114 &7
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -418,7 +418,7 @@ MonoBehaviour:
       collapsed: 0
       displayed: 1
       snapOffset: {x: -162.85718, y: -26.713013}
-      snapOffsetDelta: {x: 0, y: 0}
+      snapOffsetDelta: {x: -1.94281, y: 0}
       snapCorner: 3
       id: Tool Settings
       index: 0
@@ -811,7 +811,7 @@ MonoBehaviour:
   m_Rotation:
     m_Target: {x: 0.02685805, y: -0.94378746, z: 0.07910211, w: 0.31997168}
     speed: 2
-    m_Value: {x: 0.026856776, y: -0.9437427, z: 0.07909835, w: 0.3199565}
+    m_Value: {x: -0.026856776, y: 0.9437427, z: -0.07909836, w: -0.3199565}
   m_Size:
     m_Target: 6.5028467
     speed: 2
@@ -968,23 +968,23 @@ MonoBehaviour:
   m_SceneHierarchy:
     m_TreeViewState:
       scrollPos: {x: 0, y: 0}
-      m_SelectedIDs: ce800000
+      m_SelectedIDs: 
       m_LastClickedID: 0
-      m_ExpandedIDs: 9c93feff8cd5feff0ce3feff0a04ffff5a89ffff628dffffc290ffff709effffe4a0ffff22fbffff
+      m_ExpandedIDs: 823ffeff
       m_RenameOverlay:
         m_UserAcceptedRename: 0
-        m_Name: scene
-        m_OriginalName: scene
+        m_Name: 
+        m_OriginalName: 
         m_EditFieldRect:
           serializedVersion: 2
           x: 0
           y: 0
           width: 0
           height: 0
-        m_UserData: -76546
+        m_UserData: 0
         m_IsWaitingForDelay: 0
         m_IsRenaming: 0
-        m_OriginalEventType: 0
+        m_OriginalEventType: 11
         m_IsRenamingFilename: 0
         m_ClientGUIView: {fileID: 9}
       m_SearchString: 
@@ -1038,8 +1038,7 @@ MonoBehaviour:
     m_ShowAllHits: 0
     m_SkipHidden: 0
     m_SearchArea: 1
-    m_Folders:
-    - Assets/Models/small_modern_bedroom
+    m_Folders: []
     m_Globs: []
     m_OriginalText: 
     m_ImportLogFlags: 0
@@ -1048,14 +1047,14 @@ MonoBehaviour:
   m_StartGridSize: 64
   m_LastFolders: []
   m_LastFoldersGridSize: -1
-  m_LastProjectPath: E:\Rendering Projects - Unity SRP\Kaiser-Render-Pipeline
+  m_LastProjectPath: D:\Unity Projects\Kaiser-Render-Pipeline
   m_LockTracker:
     m_IsLocked: 0
   m_FolderTreeState:
     scrollPos: {x: 0, y: 0}
     m_SelectedIDs: 14c40000
     m_LastClickedID: 50196
-    m_ExpandedIDs: 00000000b0800000b2800000b4800000b6800000b8800000ba800000bc800000be800000c0800000c2800000c4800000c6800000c8800000ca800000cc800000ce800000d0800000d2800000
+    m_ExpandedIDs: 
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1083,7 +1082,7 @@ MonoBehaviour:
     scrollPos: {x: 0, y: 0}
     m_SelectedIDs: 
     m_LastClickedID: 0
-    m_ExpandedIDs: ffffffff00000000b0800000b2800000b4800000b6800000b8800000ba800000bc800000be800000c4800000c6800000c8800000ca800000cc800000d2800000e082000022830000
+    m_ExpandedIDs: ffffffff0e060000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
