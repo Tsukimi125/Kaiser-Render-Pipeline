@@ -289,10 +289,6 @@ void SSGI_Bilateralfilter_Y(uint3 id : SV_DispatchThreadID)
     _SSGI_Out_SpatialTexture[id.xy] = BilateralBlur(_SSGI_Spatial_Radius, uv, half2(0, invResolution.y), _SSGI_SpatialTexture, _CameraDepthTexture, sampler_bilinear_clamp);
 }
 
-
-
-
-
 #pragma kernel SSGI_Combine
 
 Texture2D<float4> _SSGI_ColorMask;

@@ -22,12 +22,13 @@ public class KaiserReflection : ScriptableRendererFeature
     public class Settings
     {
 
-        public ReflectionType reflectionType = ReflectionType.RayTraced;
+        public ReflectionType reflectionType = ReflectionType.StochasticSSR;
+        public ComputeShader computeShader;
         public Resolution resolution = Resolution.Half;
+        public Texture2D blueNoise;
 
-        public RayTracingShader rayTracingShader;
+        // public RayTracingShader rayTracingShader;
     }
-
 
     public ReflectionRenderPass reflectionRenderPass;
     public Settings settings = new Settings();
@@ -37,7 +38,21 @@ public class KaiserReflection : ScriptableRendererFeature
     }
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
-        renderer.EnqueuePass(reflectionRenderPass);
+        if (renderingData.cameraData.camera.cameraType == CameraType.Game)
+        {
+            renderer.EnqueuePass(reflectionRenderPass);
+        }
+    }
+
+    public override void SetupRenderPasses(ScriptableRenderer renderer, in RenderingData renderingData)
+    {
+        reflectionRenderPass.ConfigureInput(ScriptableRenderPassInput.Color);
+        // reflectionRenderPass.Setup(renderer.cameraColorTarget);
+    }
+    /// <inheritdoc/>
+    protected override void Dispose(bool disposing)
+    {
+        reflectionRenderPass.Dispose();
     }
 
 

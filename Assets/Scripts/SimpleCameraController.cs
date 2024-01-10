@@ -77,7 +77,7 @@ namespace UnityTemplateProjects
         public float rotationLerpTime = 0.01f;
 
         [Tooltip("Whether or not to invert our Y axis for mouse input to rotation.")]
-        public bool invertY = true;
+        public bool invertY = false;
 
 #if ENABLE_INPUT_SYSTEM
         InputAction movementAction;

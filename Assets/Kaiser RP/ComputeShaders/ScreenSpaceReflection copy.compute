@@ -73,7 +73,7 @@ void SSR_RayTracing(uint3 id : SV_DispatchThreadID)
     float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
     half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
     float3 worldNormal = UnpackNormal(gbuffer2.xyz);
-    // float3 viewNormal = mul(UNITY_MATRIX_V, float4(worldNormal, 1.0)).xyz;
+
     float3 viewNormal = TransformWorldToViewNormal(worldNormal);
 
     float4 NDCPos = ComputeClipSpacePosition(uv, depth);
@@ -188,29 +188,7 @@ RWTexture2D<float4> _SSR_Out_TemporalFilter;
 [numthreads(8, 8, 1)]
 void SSR_TemporalFilter(uint3 id : SV_DispatchThreadID)
 {
-    float2 uv = (id.xy + 0.5) * _SSR_BufferSize.zw;
-    half hitDepth = _SSR_UVWPdf.SampleLevel(sampler_linear_clamp, uv, 0).z;
-
-    // get reprojection velocity
-    float2 velocity = GetMotionVector(hitDepth, uv, _SSR_InvViewProjMatrix, _SSR_PrevViewProjMatrix, _SSR_ViewProjMatrix);
-
-    // Get AABB ClipBox
-    half SSR_Variance = 0;
-    half4 SSR_CurrColor = 0;
-    half4 SSR_MinColor, SSR_MaxColor;
-    ResolverAABB(_SSR_SpatialFilter, sampler_linear_clamp, 0, 10, _SSR_TemporalScale, uv, _SSR_BufferSize.xy, SSR_Variance, SSR_MinColor, SSR_MaxColor, SSR_CurrColor);
-
-    // // Clamp TemporalColor
-    half4 SSR_PrevColor = _SSR_Temporal_PrevTexture.SampleLevel(sampler_linear_clamp, uv - velocity, 0);
-
-    //half4 SSR_PrevColor = Bilateralfilter(_SSR_TemporalPrev_RT, UV - Velocity, _SSR_ScreenSize.xy);
-    SSR_PrevColor = clamp(SSR_PrevColor, SSR_MinColor, SSR_MaxColor);
-
-    // Combine TemporalColor
-    half Temporal_BlendWeight = saturate(_SSR_TemporalWeight * (1 - length(velocity) * 8));
-    float4 reflectionColor = lerp(SSR_CurrColor, SSR_PrevColor, Temporal_BlendWeight);
-
-    _SSR_Out_TemporalFilter[id.xy] = reflectionColor;
+    
 }
 
 

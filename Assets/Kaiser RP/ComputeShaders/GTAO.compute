@@ -1,0 +1,180 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel GTAO
+#pragma kernel AO_Combine
+
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/Shaders/Utils/Deferred.hlsl"
+
+#include "../ShaderLibrary/KaiserAO.hlsl"
+#include "../ShaderLibrary/RandomFunctions.hlsl"
+#include "../ShaderLibrary/SamplingFunctions.hlsl"
+
+// #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+// #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareNormalsTexture.hlsl"
+
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> _AO_ColorMask_RT;
+Texture2D<float3> _BlueNoiseTexture;
+
+TEXTURE2D_X_HALF(_GBuffer2);
+
+float4 _AO_BufferSize;
+float2 _AO_Jitter;
+int _AO_FrameIndex;
+
+float _NegInvRadius2;
+
+int _AO_SliceCount;
+int _AO_DirectionCount;
+float _AO_Intensity;
+float _AO_Radius;
+float _AO_HalfProjScale;
+
+float _AO_TemporalOffsets;
+float _AO_TemporalDirections;
+
+Texture2D _CameraDepthTexture;
+SAMPLER(sampler_CameraDepthTexture);
+
+SAMPLER(sampler_point_clamp);
+SAMPLER(sampler_point_repeat);
+SAMPLER(sampler_linear_clamp);
+SAMPLER(sampler_linear_repeat);
+
+float4x4 _AO_ProjectionMatrix;
+float4x4 _AO_InverseProjectionMatrix;
+
+float _AngleBias = 0.1f * PI;
+// float _MaxRadiusPixels = 256.0;
+
+[numthreads(8, 8, 1)]
+void GTAO(uint3 id:SV_DispatchThreadID)
+{
+    float2 resolution = _AO_BufferSize.xy;
+    float2 invResolution = _AO_BufferSize.zw;
+    float2 uv = (id.xy + 0.5) * invResolution;
+
+    #ifndef UNITY_REVERSED_Z
+        uv.y = 1.0 - uv.y;
+    #endif
+
+    uint2 pixelPosition = id.xy + _AO_Jitter;
+    
+    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, uv, 0).r;
+    [branch]
+    if (depth <= 1e-7)
+    {
+        _AO_ColorMask_RT[id.xy] = 0;
+        return;
+    }
+    
+    float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
+    half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
+
+    float3 worldNormal = UnpackNormal(gbuffer2.xyz);
+    float3 viewNormal = TransformWorldToViewNormal(worldNormal);
+
+    float4 NDCPos = ComputeClipSpacePosition(uv, depth);
+    float3 worldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
+    float3 viewPos = ComputeViewSpacePosition(uv, depth, UNITY_MATRIX_I_P);
+    viewPos.z = -viewPos.z;
+
+    float3 viewDir = normalize(-viewPos);
+
+    float stepRadius = (max(min((_AO_Radius * 31) / viewPos.z, 512), (float)_AO_SliceCount)) / ((float)_AO_SliceCount + 1);
+    // float stepRadius = (max(min((_AO_Radius * _AO_HalfProjScale) / viewPos.z, 256), (float)_AO_SliceCount)) / ((float)_AO_SliceCount + 1);
+    float noiseOffset = frac(GTAO_Offsets(pixelPosition) + _AO_TemporalOffsets);
+    float noiseDirection = GTAO_Noise(float2(pixelPosition)) + _AO_TemporalDirections;
+
+    float2 radius_thickness = lerp(half2(_AO_Radius, 1), half2(0, 0), ComputeDistanceFade(viewPos.z).xx);
+    float radius = radius_thickness.x;
+    float thickness = radius_thickness.y;
+    
+    float angle, sliceLength;
+    float n, cos_n;
+    float2 uvOffset, h1h2, h1h2Length, falloff, h, H;
+    float3 sliceDir, h1, h2, planeNormal, planeTangent, sliceNormal, BentNormal;
+    float4 uvSlice;
+
+    float BentAngle = 0.0;
+    float Occlusion = 0.0;
+
+    [loop]
+    for (int i = 0; i < _AO_DirectionCount; i++)
+    {
+
+        angle = (i + noiseDirection) * (PI / (float)_AO_DirectionCount);
+        sliceDir = float3(cos(angle), sin(angle), 0.0);
+        // get normal
+
+        planeNormal = normalize(cross(sliceDir, viewDir));
+        planeTangent = cross(viewDir, planeNormal);
+        sliceNormal = viewNormal - planeNormal * dot(viewNormal, planeNormal);
+        sliceLength = length(sliceNormal);
+
+        cos_n = clamp(dot(normalize(sliceNormal), viewDir), -1, 1);
+        n = -sign(dot(sliceNormal, planeTangent)) * acos(cos_n);
+        h = -1;
+
+        [loop]
+        for (int j = 0; j < _AO_SliceCount; j++)
+        {
+            uvOffset = (sliceDir.xy * invResolution) * max(stepRadius * (j + noiseOffset), 1 + j);
+            uvSlice = uv.xyxy + float4(uvOffset.xy, -uvOffset);
+
+            h1 = ComputeViewSpacePosition(uvSlice.xy, SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, uvSlice.xy, 0).r, UNITY_MATRIX_I_P).xyz - viewPos;
+            h2 = ComputeViewSpacePosition(uvSlice.zw, SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, uvSlice.zw, 0).r, UNITY_MATRIX_I_P).xyz - viewPos;
+            h1.z = -h1.z;
+            h2.z = -h2.z;
+
+            h1h2 = float2(dot(h1, h1), dot(h2, h2));
+            h1h2Length = rsqrt(h1h2);
+
+            falloff = saturate(h1h2 * (2 / radius * radius));
+
+            H = float2(dot(h1, viewDir), dot(h2, viewDir)) * h1h2Length;
+            h.xy = (H.xy > h.xy) ? lerp(H, h, falloff):lerp(H.xy, h.xy, thickness);
+        }
+
+        h = acos(clamp(h, -1, 1));
+        h.x = n + max(-h.x - n, -HALF_PI);
+        h.y = n + min(h.y - n, HALF_PI);
+
+        BentAngle = (h.x + h.y) * 0.5;
+        BentNormal += viewDir * cos(BentAngle) - planeTangent * sin(BentAngle);
+
+        // Occlusion += sliceLength * 0.1;// * IntegrateArc_CosWeight(h, n) * 10;
+        Occlusion += sliceLength * IntegrateArc_CosWeight(h, n) / _AO_DirectionCount;// * IntegrateArc_CosWeight(h, n) * 10;
+
+    }
+    
+    // _AO_ColorMask_RT[id.xy] = float4(angle, 0.0, 0.0, 1.0);
+    // _AO_ColorMask_RT[id.xy] = sliceDir.xyzx;
+    // _AO_ColorMask_RT[id.xy] = float4(h1h2Length.x, h1h2Length.y, 0.0, 1.0);
+    _AO_ColorMask_RT[id.xy] = n;
+    // _AO_ColorMask_RT[id.xy] = Occlusion * 0.8;
+
+}
+
+Texture2D<float4> _AO_In_AmbientOcclusionRT;
+Texture2D<float4> _AO_In_SceneColorRT;
+RWTexture2D<float4> _AO_Out_FinalRT;
+
+[numthreads(8, 8, 1)]
+void AO_Combine(uint3 id:SV_DispatchThreadID)
+{
+    float2 resolution = _AO_BufferSize.xy;
+    float2 invResolution = _AO_BufferSize.zw;
+    float2 uv = (id.xy + 0.5) * invResolution;
+
+    float3 sceneColor = SAMPLE_TEXTURE2D_LOD(_AO_In_SceneColorRT, sampler_linear_clamp, uv, 0).rgb;
+    float3 ao = SAMPLE_TEXTURE2D_LOD(_AO_In_AmbientOcclusionRT, sampler_linear_clamp, uv, 0).rgb;
+    
+    _AO_Out_FinalRT[id.xy] = float4(sceneColor * ao, 1.0);
+    // _AO_Out_FinalRT[id.xy] = float4(1.0, 0.0, 0.0, 1.0);
+
+}

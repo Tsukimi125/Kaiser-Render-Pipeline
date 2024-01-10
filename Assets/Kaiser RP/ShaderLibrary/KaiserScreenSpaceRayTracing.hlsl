@@ -1,99 +1,122 @@
 #ifndef KAISER_SCREEN_SPACE_RAY_TRACING
 #define KAISER_SCREEN_SPACE_RAY_TRACING
 
-float rand(float a)
+#include "../ShaderLibrary/RandomFunctions.hlsl"
+
+// Help functions
+float2 rand(float2 a)
 {
-    return frac(sin(a * (91.3458)) * 47453.5453);
+    return float2(
+        frac(sin(dot(a.xy, float2(12.9898, 78.233))) * 43758.5453),
+        frac(sin(dot(a.xy, float2(62.3587, 28.148))) * 17859.2547)
+    );
 }
 
-float3 LinearTrace(
-    float3 ro, float3 rd, float random, out float3 intersectionPos, out float3 binaryIntersectionPos,
-    float rawDepth,
-    float4x4 viewProjMatrix,
-    Texture2D depthTexture, SamplerState depthTextureSampler
-)
+float3x3 GetTangentBasis(float3 TangentZ)
 {
-    bool jitter = true;
-    float startingStep = 0.05;
-    float stepMult = 1.15;
-    const int steps = 40;
-    const int binarySteps = 5;
+    float3 UpVector = abs(TangentZ.z) < 0.999 ? float3(0, 0, 1):float3(1, 0, 0);
+    float3 TangentX = normalize(cross(UpVector, TangentZ));
+    float3 TangentY = cross(TangentZ, TangentX);
+    return float3x3(TangentX, TangentY, TangentZ);
+}
 
-    float maxIntersectionDepthDistance = 1.5;
-    float step = startingStep;
+float3 TangentToWorld_(float3 Vec, float3 TangentZ)
+{
+    return mul(Vec, GetTangentBasis(TangentZ));
+}
 
-    float3 pos = ro;
-    float3 p1, p2;
-    float3 lastPos = pos;
-    bool intersected = false;
-    bool possibleIntersection = false;
-    float lastRecordedDepthBuffThatIntersected;
-    
-    intersectionPos = pos;
-    binaryIntersectionPos = pos;
+float4 TangentToWorld(float3 Vec, float4 TangentZ)
+{
+    half3 T2W = TangentToWorld_(Vec, TangentZ.rgb);
+    return half4(T2W, TangentZ.a);
+}
 
-    
-    for (int i = 0; i < steps; i++)
+struct Ray
+{
+    float3 pos;
+    float3 dir;
+};
+
+struct RayHit
+{
+    bool hitSuccessful;
+    float2 hitUV;
+};
+
+struct RayMarchingSetting
+{
+    half stepSize;
+    half maxSteps;
+    half maxDistance;
+    bool useBinarySearch;
+};
+
+RayHit InitializeRayHit()
+{
+    RayHit rayHit;
+    rayHit.hitSuccessful = false;
+    rayHit.hitUV = float2(0.0, 0.0);
+    return rayHit;
+}
+
+RayHit LinearTrace(
+    Ray ray, Texture2D _CameraDepthTexture, SamplerState sampler_CameraDepthTexture, uint2 random,
+    out bool hitSuccessful, out float2 hitUV)
+{
+    RayHit rayHit = InitializeRayHit();
+    float raymarchingThickness = 0.1;
+    float stepSize = 0.1;
+    float stepMultiplier = 1.2;
+    float3 rayWorldPos = ray.pos;
+    float3 rayNDCPos = float3(0.0, 0.0, 0.0);
+
+    float p1;
+
+    hitSuccessful = false;
+
+    bool startBinarySearch = false;
+    [loop]
+    for (uint i = 1; i <= 128; i++)
     {
-        float jitter = 0.5 + 0.5 * frac(rand(pos.x + pos.y + pos.z) + random);
-
-        pos = ro + rd * step * jitter;
-
-        float4 projPos = mul(viewProjMatrix, float4(pos, 0.0));
-        float2 NDCPos = projPos.xy / projPos.w;
-        float2 uvPos = NDCPos * 0.5 + 0.5;
-
-        [branch]
-        if (uvPos.x < 0 || uvPos.x > 1 || uvPos.y < 0 || uvPos.y > 1)
-        {
-            continue;
-        }
-
-        float sampleDepth = depthTexture.SampleLevel(depthTextureSampler, uvPos, 0).r;
-        float linearEyeDepth = LinearEyeDepth(sampleDepth, _ZBufferParams);
-
-        // [branch]
-        // if (sampleDepth == 0.0)
-        // {
-        //     sampleDepth = 9999999.0;
-        // }
+        float2 hash = frac(Hammersley16(i, (uint)128, random));
+        rayWorldPos += ray.dir * stepSize * (1 + hash.x);
+        rayNDCPos = ComputeNormalizedDeviceCoordinatesWithZ(rayWorldPos, UNITY_MATRIX_VP);
         
-        // Step 1: Find the first depth buffer sample that intersects the ray
+        bool isScreenSpace = (rayNDCPos.x > 0.0 && rayNDCPos.y > 0.0 && rayNDCPos.x < 1.0 && rayNDCPos.y < 1.0) ? true:false;
+        if (!isScreenSpace)
+            break;
+        
+        float deviceDepth = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, sampler_CameraDepthTexture, rayNDCPos.xy, 0).r; // z buffer depth
+        float sceneDepth = LinearEyeDepth(deviceDepth, _ZBufferParams);
+        float hitDepth = LinearEyeDepth(rayNDCPos.z, _ZBufferParams);
+        float depthDiff = sceneDepth - hitDepth;
+        
+        bool isSky;
+        #ifdef UNITY_REVERSED_Z
+            isSky = deviceDepth == 0.0 ? true:false;
+        #else
+            isSky = deviceDepth == 1.0 ? true:false; // OpenGL Platforms.
+        #endif
 
-        float deltaDepth = 0;
-        [branch]
-        if (abs(rawDepth - sampleDepth) > 0 && sampleDepth > 0)
+        half sign = FastSign(depthDiff);
+
+        startBinarySearch = startBinarySearch || (sign == -1) ? true:false;
+        if (startBinarySearch && FastSign(stepSize) != sign)
         {
-            deltaDepth = pos.z - linearEyeDepth;
-
-            [branch]
-            if (deltaDepth > 0)
-            {
-                possibleIntersection = true;
-                lastRecordedDepthBuffThatIntersected = linearEyeDepth;
-                p1 = lastPos;
-                p2 = pos;
-                break;
-            }
+            stepSize = stepSize * sign * 0.5;
+            raymarchingThickness = raymarchingThickness * 0.5;
         }
-
-        lastPos = pos;
-        pos += rd * step * (1.0 - jitter);
-        step *= stepMult;
-
-        // Step 2: Binary search between p1 and p2 to find the exact intersection point
-        intersectionPos = p2;
-        binaryIntersectionPos = p2;
-
-        // Step 3: get the intersection point
-        [branch]
-        if (possibleIntersection && abs(p2.z - lastRecordedDepthBuffThatIntersected) < maxIntersectionDepthDistance) //&& abs(depthAtP2 - lastRecordedDepthBuffThatIntersected) < maxIntersectionDepthDistance)
+        
+        hitSuccessful = (depthDiff <= 0.0 && (depthDiff >= -raymarchingThickness) && !isSky) ? true:false;
+        if (hitSuccessful)
         {
-            intersected = true;
+            break;
         }
+        stepSize *= stepMultiplier * (1 + hash.y);
     }
 
-    return intersectionPos;
+    hitUV = rayNDCPos.xy;
+    return rayHit;
 }
 
 

@@ -1,0 +1,182 @@
+fileFormatVersion: 2
+guid: 1364f79985eab784fb3d0fefd3b4543b
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Coated_Black_Glossy
+    second: {fileID: 2100000, guid: 0cda6f81fefb6e946a927474d1655695, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Decal_Caution
+    second: {fileID: 2100000, guid: 0bb275e70f0b13a46ad5aab1c3526cb8, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Decal_First_Aid_Kit
+    second: {fileID: 2100000, guid: ff8c5c66d2c01f841b8e9dcb4a1159ed, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Decal_Keyboard_01
+    second: {fileID: 2100000, guid: cdc3ce1e67b89224aac4ff41395ddbbe, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Decal_Note_01
+    second: {fileID: 2100000, guid: 1e4add9f9f5c06c4485dc7bacca78e33, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Glass_Dark_01
+    second: {fileID: 2100000, guid: afd96962cd8fea045816050c2e1fd223, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Metal_Aluminium
+    second: {fileID: 2100000, guid: 2f2263687806e004d8ac3b7d9c961523, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Metal_Blue
+    second: {fileID: 2100000, guid: c7d2936def2ba5944b56a748c26d6bee, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Paper_StickyNote_01
+    second: {fileID: 2100000, guid: 1fa0dff6713d3aa43ae8cb7891585a19, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Blue
+    second: {fileID: 2100000, guid: a67f43c4c6d265a4795107f517ee1fb9, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Blue_ExtraLight
+    second: {fileID: 2100000, guid: 9e5bd2e9594123c499f028d940b68ee7, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Blue_Satin
+    second: {fileID: 2100000, guid: 88eb714eb71827f4a8d162d7b1ebe3c9, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Brown_Dark
+    second: {fileID: 2100000, guid: b97c32c30e7f66b4a90ccffa0ae8c466, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Brown_Satin
+    second: {fileID: 2100000, guid: 4a99d844a1fc44b418fc0860064d9a7d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Dark_Matte
+    second: {fileID: 2100000, guid: 76aaa156542574b43806ee6ee176a165, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Decals
+    second: {fileID: 2100000, guid: 21bcfad1efeafcc40bf8728469ea555b, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Grey_Dark
+    second: {fileID: 2100000, guid: 939714a34c13e6948abab60cd5abaf5f, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_MediumGrey_Glossy
+    second: {fileID: 2100000, guid: 47bd0484f312afd4a9a62a9e03d7c633, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Orange_Satin
+    second: {fileID: 2100000, guid: 00b1d99ac6cd1254ca95989a19bdb5cc, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Pink_Details
+    second: {fileID: 2100000, guid: 61604a8eb5b05094e8fc7d85c562fd97, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Red_Matte
+    second: {fileID: 2100000, guid: 614dd6c8fe5f9e24aa4013a2bb3d6c4b, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Red_Transparent
+    second: {fileID: 2100000, guid: 0995d18a30cc2c448b4306a200dfda00, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Tape_Glossy
+    second: {fileID: 2100000, guid: ee74eb7005914ff4ba28b4fc82d6a8ca, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_Wall_Only
+    second: {fileID: 2100000, guid: 7d7d211341702434d9c694500af885db, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Plastic_White_Matte
+    second: {fileID: 2100000, guid: e70cc095aa2686e4f9a56f30bece228a, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Wax_Pastel_Blue_01
+    second: {fileID: 2100000, guid: fdbdc7ef9c8f5f940affc3725a2a59c8, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Wax_Pastel_Label_02
+    second: {fileID: 2100000, guid: a01cf4f1f2d3100479b0e8623a190baa, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Wax_Pastel_Yellow_01
+    second: {fileID: 2100000, guid: ef7b2134a3780dc4487464497ad6feb8, type: 2}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: Decal_Caution_baseColor
+    second: {fileID: 2800000, guid: dfdebfcb067677e4e884f152568f657e, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: Decal_First_Aid_Kit_baseColor
+    second: {fileID: 2800000, guid: 0a28e930595e7064fa6a071132c8be91, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: Decal_Keyboard_01_baseColor
+    second: {fileID: 2800000, guid: 3561448a7f3f8aa4aa2af19cc376aba1, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: Decal_Note_01_baseColor
+    second: {fileID: 2800000, guid: 5033541aa0fca7341919391ff0b3d38b, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: Metal_Aluminium_metallicRoughness.standard
+    second: {fileID: 2800000, guid: d4ad85a494b30d94bad5c695e4711c9e, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: Wax_Pastel_Label_02_baseColor
+    second: {fileID: 2800000, guid: bafb0ab738d32aa48bc3dc5ddf65ee21, type: 3}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: aecd2106718f2444db3ca21345da2cef, type: 3}
+  reverseAxis: 0
+  renderPipeline: 1

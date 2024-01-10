@@ -1,5 +1,6 @@
-#pragma kernel SSR_RayTracing_RayMarching
-#pragma kernel SSR_RayTracing_Hiz
+#pragma kernel SSR_RayTracing_Linear
+#pragma kernel SSR_TemporalFilter
+#pragma kernel SSR_SpatialFilter
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
@@ -9,27 +10,19 @@
 #include "../ShaderLibrary/RandomFunctions.hlsl"
 #include "../ShaderLibrary/SamplingFunctions.hlsl"
 #include "../ShaderLibrary/KaiserSpaceTransformFunctions.hlsl"
+#include "../ShaderLibrary/KaiserScreenSpaceRayTracing.hlsl"
 #include "../ShaderLibrary/KaiserTemporal.hlsl"
 
-// #include "../ShaderLibrary/ScreenSpaceRayTracing.hlsl"
-#include "../ShaderLibrary/KaiserScreenSpaceRayTracing.hlsl"
-#include "../ShaderLibrary/KaiserHizTrace.hlsl"
-// #include "../ShaderLibrary/SSRT.hlsl"
 
 #define BRDF_BIAS 0.7f
 
-RWTexture2D<float4> _SSR_Out_UVWPdf;
-RWTexture2D<float4> _SSR_Out_ColorMask;
-
 int _SSR_FrameIndex;
 
-Texture2D _SSR_PyramidDepth_RT;
-
 TEXTURE2D_X(_CameraDepthTexture);
-Texture2DArray _DepthPyramid;
-SAMPLER(sampler_DepthPyramid);
+TEXTURE2D_X(_SSR_In_SceneColor_RT);
+TEXTURE2D_X(_SSR_In_BlueNoise_RT);
 
-TEXTURE2D_X(_SSR_SceneColor_RT);
+
 TEXTURE2D_X_HALF(_GBuffer0);
 TEXTURE2D_X_HALF(_GBuffer1);
 TEXTURE2D_X_HALF(_GBuffer2);
@@ -40,6 +33,7 @@ SAMPLER(sampler_linear_clamp);
 SAMPLER(sampler_bilinear_clamp);
 
 float4 _SSR_BufferSize;
+float4 _SSR_Random;
 
 float4x4 _SSR_ViewMatrix;
 float4x4 _SSR_InvViewMatrix;
@@ -51,397 +45,303 @@ float4x4 _SSR_PrevViewProjMatrix;
 
 float2 _SSR_Jitter;
 
-float _SSR_Thickness;
-float _SSR_ScreenFade;
-int _Hiz_MaxLevel;
-int _Hiz_StartLevel;
-int _Hiz_StopLevel;
-int _SSR_MaxRaySteps;
-float _SSR_TemporalWeight;
-float _SSR_TemporalScale;
 
+RWTexture2D<float4> _SSR_ColorMask_RT;
 [numthreads(8, 8, 1)]
-void SSR_RayTracing_RayMarching(uint3 id : SV_DispatchThreadID)
+void SSR_RayTracing_Linear(uint3 id:SV_DispatchThreadID)
 {
     float2 resolution = _SSR_BufferSize.xy;
     float2 invResolution = _SSR_BufferSize.zw;
-    float2 uv = (id.xy + _SSR_Jitter) * invResolution;
+    float2 uv = (id.xy) * invResolution;
+    // float2 jitteredUV = (id.xy + _SSR_Jitter) * invResolution;
+
+    #ifndef UNITY_REVERSED_Z
+        uv.y = 1.0 - uv.y;
+    #endif
 
     uint2 pixelPosition = id.xy + _SSR_Jitter;
     
-    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 0);
+    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, uv, 0).r;
 
     [branch]
     if (depth <= 1e-7)
     {
         // _SSR_Out_UVWPdf[id.xy] = 0;
-        _SSR_Out_ColorMask[id.xy] = 0;
+        _SSR_ColorMask_RT[id.xy] = 0;
         return;
     }
+    
 
     float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
     half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
+    half metallic = _GBuffer1.SampleLevel(sampler_linear_clamp, uv, 0).r;
+
+    half3 F0 = 0.4.xxx;
+    half3 albedo = _GBuffer0.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
+    F0 = lerp(F0, albedo, metallic);
+
     float3 worldNormal = UnpackNormal(gbuffer2.xyz);
-    // float3 viewNormal = mul(UNITY_MATRIX_V, float4(worldNormal, 1.0)).xyz;
     float3 viewNormal = TransformWorldToViewNormal(worldNormal);
 
     float4 NDCPos = ComputeClipSpacePosition(uv, depth);
-    float3 worldPos = ComputeWorldSpacePosition(uv, depth, _SSR_InvViewProjMatrix);
-    float3 viewPos = ComputeViewSpacePosition(uv, depth, _SSR_InvProjMatrix);
-    // float3 worldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
-    // float3 viewPos = ComputeViewSpacePosition(uv, depth, UNITY_MATRIX_I_P);
+    // float3 worldPos = ComputeWorldSpacePosition(uv, depth, _SSR_InvViewProjMatrix);
+    // float3 viewPos = ComputeViewSpacePosition(uv, depth, _SSR_InvProjMatrix);
+    float3 worldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
+    float3 viewPos = ComputeViewSpacePosition(uv, depth, UNITY_MATRIX_I_P);
     viewPos.z = -viewPos.z;
 
     // rand gen
-    uint frameIDMod8 = uint(fmod(_SSR_FrameIndex, 8));
+    uint frameIDMod8 = uint(fmod(_SSR_FrameIndex + int(32 * _SSR_Random.x), 32));
     uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
-    float2 hash = Hammersley16(0, (uint)1, random);
+    float2 hash = frac(Hammersley16(frameIDMod8, (uint)32, random));
     // hash.y = lerp(hash.y, 0, BRDF_BIAS);
-
-    float4 H = float4(0, 0, 0, 0);
-    if (roughness > 0.1)
-    {
-        H = TangentToWorld(ImportanceSampleGGX(hash, roughness).xyz, float4(worldNormal, 1.0));
-    }
-    else
-    {
-        H = float4(viewNormal, 1.0);
-    }
-    float3 reflectionDir = reflect(normalize(viewPos), H.xyz);
-
-    bool intersect = false;
-    float3 intersectPos;
-    float3 binaryIntersectPos = float3(0, 0, 0);
-
-    // intersect = LinearTrace(
-    //     worldPos, reflectionDir, hash.y, intersectPos, binaryIntersectPos, 
-    //     depth, 
-    //     _SSR_ViewProjMatrix, 
-    //     _CameraDepthTexture, sampler_point_clamp
-    // );
-
-    float3 ro = viewPos;
-    float3 rd = reflectionDir;
-
-    bool jitter = true;
-    float startingStep = 0.1;
-    float stepMult = 1.0;
-    const int steps = 2560;
-    const int binarySteps = 5;
-
-    float maxIntersectionDepthDistance = 1.5;
-    float step = startingStep;
-
-    float3 pos = ro;
-    float3 p1, p2;
-    float3 lastPos = pos;
-    bool intersected = false;
-    bool possibleIntersection = false;
-    float lastRecordedDepthBuffThatIntersected;
+    // float2 hash = SAMPLE_TEXTURE2D_LOD(_SSR_In_BlueNoise_RT, sampler_point_repeat, float2((rand(uv + _SSR_Jitter.xy))), 0).rg; //  * _SSR_RayCastSize.xy / _SSR_NoiseSize.xy
     
-    float3 intersectionPos = pos;
-    float3 binaryIntersectionPos = pos;
-    float2 intersectionUV = uv;
-    
-    for (int i = 0; i < steps; i++)
-    {
-        float jitter = 0.5 + 0.5 * frac(rand(pos.x + pos.y + pos.z) + random);
-        float4 projPos = mul(_SSR_ProjMatrix, float4(pos, 0.0));
-        float2 NDCPos = projPos.xy / projPos.w;
-        float2 uvPos = NDCPos * 0.5 + 0.5;
-        
-        pos = ro + rd * step * jitter;
-        // pos = ro + rd * step * jitter;
 
-        
-        
-        float sampleDepth = _CameraDepthTexture.SampleLevel(sampler_point_clamp, uvPos, 0).r;
-        float linearEyeDepth = LinearEyeDepth(sampleDepth, _ZBufferParams);
-        
-        [branch]
-        if (uvPos.x < 0 || uvPos.x > 1 || uvPos.y < 0 || uvPos.y > 1)
-        {
-            continue;
-        }
-
-        // Step 1: Find the first depth buffer sample that intersects the ray
-        
-        float deltaDepth = 0;
-        [branch]
-        if (abs(depth - sampleDepth) > 0 && sampleDepth > 0)
-        {
-            deltaDepth = -pos.z - linearEyeDepth;
-            
-            // _SSR_Out_ColorMask[id.xy] = float4(pos, 1.0);
-            [branch]
-            if (deltaDepth > 0)
-            {
-                possibleIntersection = true;
-                lastRecordedDepthBuffThatIntersected = linearEyeDepth;
-                p1 = lastPos;
-                p2 = pos;
-                intersectionUV = uvPos;
-                break;
-            }
-        }
-
-        lastPos = pos;
-        pos += rd * step * (1.0 - jitter);
-        step *= stepMult;
-
-        // Step 2: Binary search between p1 and p2 to find the exact intersection point
-        intersectionPos = p2;
-        binaryIntersectionPos = p2;
-        
-        
-
-        // Step 3: get the intersection point
-        //&& abs(depthAtP2 - lastRecordedDepthBuffThatIntersected) < maxIntersectionDepthDistance)
-        [branch] 
-        if (possibleIntersection && abs(p2.z - lastRecordedDepthBuffThatIntersected) < maxIntersectionDepthDistance)
-        {
-            intersected = true;
-        }
-    }
-    // _SSR_Out_ColorMask[id.xy] = float4(intersectionUV, 0.0, 1.0);
-    float3 sceneColor = _SSR_SceneColor_RT.SampleLevel(sampler_point_clamp, intersectionUV, 0).rgb;
-    _SSR_Out_ColorMask[id.xy] = float4(sceneColor, 1.0);
-    
-    // float3 intersectPoint = hiZTrace(
-    //     _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-    //     rayStart, rayDir, _SSR_MaxRaySteps, _SSR_BufferSize.xy,
-    //     _SSR_PyramidDepth_RT, sampler_bilinear_clamp, false,
-    //     hit, isSky, iterations
-    // );
-    // float4 RayHitData = float4(intersectPoint, hit);
-    // // float4 RayHitData = Hierarchical_Z_Trace(
-    // //     _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-    // //     _SSR_MaxRaySteps, _SSR_Thickness, resolution,
-    // //     rayStart, rayDir, _SSR_PyramidDepth_RT
-    // // );
-
-    // float3 sceneColor = _SSR_SceneColor_RT.SampleLevel(sampler_linear_clamp, RayHitData.xy, 0).rgb;
-    // float mask = RayHitData.a; //* GetScreenFadeBord(RayHitData.xy, _SSR_ScreenFade);
-    // _SSR_Out_ColorMask[id.xy] = float4(sceneColor, saturate(mask * mask));
-}
-[numthreads(8, 8, 1)]
-void SSR_RayTracing_Hiz(uint3 id : SV_DispatchThreadID)
-{
-    float2 resolution = _SSR_BufferSize.xy;
-    float2 invResolution = _SSR_BufferSize.zw;
-    float2 uv = (id.xy + 0.5) * invResolution;
-
-    // TODO: USE THIS?
-    uint2 pixelPosition = id.xy + _SSR_Jitter;
-    
-    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 0);
-
-    [branch]
-    if (depth <= 1e-7)
-    {
-        // _SSR_Out_UVWPdf[id.xy] = 0;
-        _SSR_Out_ColorMask[id.xy] = 0;
-        return;
-    }
-
-    float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
-    half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
-    float3 worldNormal = UnpackNormal(gbuffer2.xyz);
-    float3 viewNormal = TransformWorldToViewNormal(worldNormal);
-
-    float4 NDCPos = ComputeClipSpacePosition(uv, depth);
-    float4 viewPos = mul(_SSR_InvProjMatrix, NDCPos);
-    viewPos.xyz /= viewPos.w;
-    
-    float3 worldPos = ComputeWorldSpacePosition(uv, depth, _SSR_InvViewProjMatrix);
-    // float3 worldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
-    float3 viewDir = normalize(worldPos - _WorldSpaceCameraPos);
-
-    uint frameIDMod8 = uint(fmod(_SSR_FrameIndex, 61) + fmod(_SSR_FrameIndex, 47 + fmod(_SSR_FrameIndex, 19)));
-    uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
-    float2 hash = Hammersley16(0, (uint)1, random);
-    hash.y = lerp(hash.y, 0, BRDF_BIAS);
-
-    float4 H = float4(worldNormal, 0);
-    [branch]
+    float4 H = float4(worldNormal, 1.0);
+    roughness = roughness * roughness;
     if (roughness > 0.1)
     {
         H = TangentToWorld(ImportanceSampleGGX(hash, roughness).xyz, float4(worldNormal, 1.0));
     }
 
-    // H = float4(worldNormal, 1.0);
-    float3 reflectionDirWS = normalize(reflect(viewDir, H.xyz));
-    float3 reflectionDirVS = mul(_SSR_ViewMatrix, float4(reflectionDirWS, 0.0)).xyz;
+    float3 reflectionDirWS = reflect(normalize(worldPos - _WorldSpaceCameraPos), H.xyz);
 
-    float3 reflectionEndPosVS = viewPos.xyz + reflectionDirVS  * viewPos.z * -1;
-    float4 reflectionEndPosCS = mul(_SSR_ProjMatrix, float4(reflectionEndPosVS, 1.0));
-    reflectionEndPosCS = reflectionEndPosCS / reflectionEndPosCS.w;
+    Ray ray;
+    ray.pos = worldPos;
+    ray.dir = reflectionDirWS;
+    float2 hitUV;
+    bool hitSuccessful;
 
-    reflectionEndPosCS.z = 1 - (reflectionEndPosCS.z);
-    NDCPos.z = 1 - (NDCPos.z);
+    LinearTrace(ray, _CameraDepthTexture, sampler_linear_clamp, random, hitSuccessful, hitUV);
 
-    float3 rayStart = float3(uv, NDCPos.z);
-    float3 rayDir = normalize((reflectionEndPosCS - NDCPos).xyz);
-    rayDir.xy *= float2(0.5f, -0.5f);
+    float3 sceneColor = _SSR_In_SceneColor_RT.SampleLevel(sampler_bilinear_clamp, hitUV, 0).rgb;
 
-    float hit = 0;
-    int iterations = 0;
-    bool isSky;
+    // brdf and pdf ?
     
-    // float3 intersectPoint = hiZTrace(
-    //     _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-    //     rayStart, rayDir, _SSR_MaxRaySteps, _SSR_BufferSize.xy,
-    //     _SSR_PyramidDepth_RT, sampler_bilinear_clamp, false,
-    //     hit, isSky, iterations
-    // );
-    float3 intersectPoint = hiZTrace(
-        _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-        rayStart, rayDir, _SSR_MaxRaySteps, _SSR_BufferSize.xy,
-        _DepthPyramid, sampler_bilinear_clamp, false,
-        hit, isSky, iterations
-    );
-    float4 RayHitData = float4(intersectPoint, hit);
-    // float4 RayHitData = Hierarchical_Z_Trace(
-    //     _Hiz_MaxLevel, _Hiz_StartLevel, _Hiz_StopLevel,
-    //     _SSR_MaxRaySteps, _SSR_Thickness, resolution,
-    //     rayStart, rayDir, _SSR_PyramidDepth_RT
-    // );
-
-    float3 sceneColor = _SSR_SceneColor_RT.SampleLevel(sampler_linear_clamp, RayHitData.xy, 0).rgb;
-    float mask = RayHitData.a; //* GetScreenFadeBord(RayHitData.xy, _SSR_ScreenFade);
-
-    float sampleDepth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 0).r;
-    _SSR_Out_ColorMask[id.xy] = float4(sceneColor, saturate(mask * mask));
-    // _SSR_Out_ColorMask[id.xy] = sampleDepth;
+    _SSR_ColorMask_RT[id.xy] = float4(F0 * sceneColor * hitSuccessful, 1.0);
 }
 
-static const int2 kStackowiakSampleSet4[15] = {
-    int2(0, 1), int2(-2, 1), int2(2, -3), int2(-3, 0), int2(1, 2), int2(-1, -2), int2(3, 0), int2(-3, 3), int2(0, -3), int2(-1, -1), int2(2, 1), int2(-2, -2), int2(1, 0), int2(0, 2), int2(3, -1)
+static const int2 offset1[9] = {
+    int2(-1.0, -1.0), int2(0.0, -1.0), int2(1.0, -1.0),
+    int2(-1.0, 0.0), int2(0.0, 0.0), int2(1.0, 0.0),
+    int2(-1.0, 1.0), int2(0.0, 2.0), int2(1.0, 1.0)
 };
 
-#pragma kernel SSR_SpatialFilter
-#define SSR_SPETIAL_COUNT 15
+static const int2 offset2[9] = {
+    int2(-2.0, -2.0), int2(0.0, -2.0), int2(2.0, -2.0),
+    int2(-2.0, 0.0), int2(0.0, 0.0), int2(2.0, 0.0),
+    int2(-2.0, 2.0), int2(0.0, 2.0), int2(2.0, 2.0)
+};
 
-Texture2D _SSR_UVWPdf;
-Texture2D _SSR_ColorMask;
 
-RWTexture2D<float4> _SSR_Out_SpatialFilter;
+Texture2D<float4> _SSR_Temporal_Prev_RT;
+Texture2D<float4> _SSR_Temporal_Curr_RT;
+RWTexture2D<float4> _SSR_Temporal_Out_RT;
 
 [numthreads(8, 8, 1)]
-void SSR_SpatialFilter(uint3 id : SV_DispatchThreadID)
+void SSR_TemporalFilter(uint3 id:SV_DispatchThreadID)
 {
     float2 resolution = _SSR_BufferSize.xy;
     float2 invResolution = _SSR_BufferSize.zw;
     float2 uv = (id.xy + 0.5) * invResolution;
 
-    uint2 pixelPosition = uint2(uv * resolution);
+    #ifndef UNITY_REVERSED_Z
+        uv.y = 1.0 - uv.y;
+    #endif
+    uint2 pixelPosition = id.xy + _SSR_Jitter;
 
-    float depth = _CameraDepthTexture.SampleLevel(sampler_bilinear_clamp, uv, 0.0f).r;
-    if (depth <= 1e-7)
+    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, uv, 0).r;
+    float4 NDCPos = ComputeClipSpacePosition(uv, depth);
+    float3 worldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
+    float4 historyNDC = mul(_SSR_PrevViewProjMatrix, float4(worldPos, 1.0));
+    // float4 historyNDC = mul(UNITY_MATRIX_VP, float4(worldPos, 1.0));
+    historyNDC /= historyNDC.w;
+    historyNDC.xy = historyNDC.xy * 0.5f + 0.5f;
+    historyNDC.y = 1.0 - historyNDC.y;
+
+
+
+    // Blend
+    float4 prevColor = _SSR_Temporal_Prev_RT.SampleLevel(sampler_linear_clamp, historyNDC.xy, 0);
+    [branch]
+    if (historyNDC.x < 0 || historyNDC.x > 1 || historyNDC.y < 0 || historyNDC.y > 1)
     {
-        _SSR_Out_SpatialFilter[id.xy] = 0;
-        return;
+        prevColor *= 0.5;//float4(0.0, 0.0, 0.0, 0.0);
+
     }
-    float3 worldNormal = _GBuffer2.SampleLevel(sampler_bilinear_clamp, uv, 0).xyz;
 
-    uint2 random = Rand3DPCG16(uint3(id.xy + 0.5, _SSR_FrameIndex)).xy;
-    float sumWeight;
-    float4 spatialColor;
+    float4 currColor = _SSR_Temporal_Curr_RT.SampleLevel(sampler_linear_clamp, uv, 0);
+    
 
-    [loop]
-    for (int i = 0; i < SSR_SPETIAL_COUNT; ++i)
-    {
-        float2 offsetUV = uv + (kStackowiakSampleSet4[i] * invResolution);
+    // float4 colorMin = currColor;
+    // float4 colorMax = currColor;
+    // float4 colorAvg = currColor;
+    // float4 sampleColors[9];
+    // float4 m1 = 0.0;
+    // float4 m2 = 0.0;
+    // [unroll]
+    // for (uint i = 0; i < 9; i++)
+    // {
+    //     sampleColors[i] = _SSR_Temporal_Curr_RT.SampleLevel(sampler_linear_clamp, uv + offset1[i] * invResolution, 0);
+    //     m1 += sampleColors[i];
+    //     m2 += sampleColors[i] * sampleColors[i];
+    // }
+    
+    // float4 mean = m1 / 9.0;
+    // float4 variance = m2 / 9.0 - mean * mean;
+    // float4 stdDev = sqrt(variance);
+    // float4 colorStdDev = max(stdDev, 0.01);
+    // float scale = 1;
+    // colorMin = mean - colorStdDev * scale;
+    // colorMax = mean + colorStdDev * scale;
+    // prevColor = RGB2YCoCgR(ToneMap(prevColor));
+    // float4 clampedColor = ClipAABB(colorMin.rgb, colorMax.rgb, colorAvg, prevColor);
+    
+    // clampedColor = UnToneMap(YCoCgR2RGB(clampedColor));
+    // prevColor = clampedColor;
+    // prevColor = clamp(prevColor, colorMin, colorMax);
+    float4 blendColor = lerp(prevColor, currColor, 0.03 + dot(historyNDC.xy - uv, historyNDC.xy - uv) * 250);
+    // blendColor = clamp(blendColor, colorMin, colorMax);
+    // colorAvg = UnToneMap(YCoCgR2RGB(colorAvg));
+    _SSR_Temporal_Out_RT[id.xy] = float4(blendColor.rgb, 1.0);
+    // _SSR_Temporal_Out_RT[id.xy] = float4(blendColor.rgb, 1.0);
+    // _SSR_Temporal_Out_RT[id.xy] = float4(historyNDC.rg, 0.0, 1.0);
 
-        half pdf = _SSR_UVWPdf.SampleLevel(sampler_bilinear_clamp, offsetUV, 0).a;
-
-        float offsetDepth = _CameraDepthTexture.SampleLevel(sampler_bilinear_clamp, offsetUV, 0).r;
-        float3 offsetNormal = _GBuffer2.SampleLevel(sampler_bilinear_clamp, offsetUV, 0).xyz;
-
-        float4 hitColorMask = _SSR_ColorMask.SampleLevel(sampler_bilinear_clamp, offsetUV, 0);
-        
-        float depthWeight = GetEdgeStopDepthWeight(depth, offsetDepth, 0.001);
-        float normalWeight = GetEdgeStoppNormalWeight(worldNormal, offsetNormal, 64);
-        float weight = depthWeight * normalWeight;
-        sumWeight += weight;
-        spatialColor += float4(hitColorMask.rgb * weight, hitColorMask.a);
-    }
-    spatialColor /= max(sumWeight, 0.00001);
-    _SSR_Out_SpatialFilter[id.xy] = spatialColor;
 }
 
-
-#pragma kernel SSR_TemporalFilter
-
-Texture2D _SSR_SpatialFilter;
-Texture2D _SSR_Temporal_PrevTexture;
-Texture2D _SSR_Temporal_CurrTexture;
-RWTexture2D<float4> _SSR_Out_TemporalFilter;
+Texture2D<float4> _SSR_Spatial_In_RT;
+RWTexture2D<float4> _SSR_Spatial_Out_RT;
 
 [numthreads(8, 8, 1)]
-void SSR_TemporalFilter(uint3 id : SV_DispatchThreadID)
-{
-    float2 uv = (id.xy + 0.5) * _SSR_BufferSize.zw;
-    half hitDepth = _SSR_UVWPdf.SampleLevel(sampler_linear_clamp, uv, 0).z;
-
-    // get reprojection velocity
-    float2 velocity = GetMotionVector(hitDepth, uv, _SSR_InvViewProjMatrix, _SSR_PrevViewProjMatrix, _SSR_ViewProjMatrix);
-
-    // Get AABB ClipBox
-    half SSR_Variance = 0;
-    half4 SSR_CurrColor = 0;
-    half4 SSR_MinColor, SSR_MaxColor;
-    ResolverAABB(_SSR_SpatialFilter, sampler_linear_clamp, 0, 10, _SSR_TemporalScale, uv, _SSR_BufferSize.xy, SSR_Variance, SSR_MinColor, SSR_MaxColor, SSR_CurrColor);
-
-    // // Clamp TemporalColor
-    half4 SSR_PrevColor = _SSR_Temporal_PrevTexture.SampleLevel(sampler_linear_clamp, uv - velocity, 0);
-
-    //half4 SSR_PrevColor = Bilateralfilter(_SSR_TemporalPrev_RT, UV - Velocity, _SSR_ScreenSize.xy);
-    SSR_PrevColor = clamp(SSR_PrevColor, SSR_MinColor, SSR_MaxColor);
-
-    // Combine TemporalColor
-    half Temporal_BlendWeight = saturate(_SSR_TemporalWeight * (1 - length(velocity) * 8));
-    float4 reflectionColor = lerp(SSR_CurrColor, SSR_PrevColor, Temporal_BlendWeight);
-
-    _SSR_Out_TemporalFilter[id.xy] = reflectionColor;
-}
-
-
-#pragma kernel SSR_Combine
-
-Texture2D<float4> _SSR_FinalColor;
-
-RWTexture2D<float4> _SSR_Out_Combine;
-
-
-[numthreads(8, 8, 1)]
-void SSR_Combine(uint3 id : SV_DispatchThreadID)
+void SSR_SpatialFilter(uint3 id:SV_DispatchThreadID)
 {
     float2 resolution = _SSR_BufferSize.xy;
     float2 invResolution = _SSR_BufferSize.zw;
-    float2 uv = (id.xy + 0.5) * invResolution;
+    float2 uv = (id.xy) * invResolution;
 
-    float depth = _CameraDepthTexture.SampleLevel(sampler_linear_clamp, uv, 0).r;
+    const float2 offset[25] = {
 
-    float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
-    half metallic = _GBuffer1.SampleLevel(sampler_linear_clamp, uv, 0).r;
-    half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
+        {
+            - 2, -2
+        },
+        {
+            - 1, -2
+        },
+        {
+            0, -2
+        },
+        {
+            1, -2
+        },
+        {
+            2, -2
+        },
+        {
+            - 2, -1
+        },
+        {
+            - 1, -1
+        },
+        {
+            0, -1
+        },
+        {
+            1, -1
+        },
+        {
+            2, -1
+        },
+        {
+            - 2, 0
+        },
+        {
+            - 1, 0
+        },
+        {
+            0, 0
+        },
+        {
+            1, 0
+        },
+        {
+            2, 0
+        },
+        {
+            - 2, 1
+        },
+        {
+            - 1, 1
+        },
+        {
+            0, 1
+        },
+        {
+            1, 1
+        },
+        {
+            2, 1
+        },
+        {
+            - 2, 2
+        },
+        {
+            - 1, 2
+        },
+        {
+            0, 2
+        },
+        {
+            1, 2
+        },
+        {
+            2, 2
+        }
+    };
 
-    float3 worldNormal = UnpackNormal(gbuffer2.xyz);
-    float3 worldPos = ComputeWorldSpacePosition(uv, depth, _SSR_InvViewProjMatrix);
-    float3 viewDir = normalize(worldPos - GetCameraPositionWS());
+    #ifndef UNITY_REVERSED_Z
+        uv.y = 1.0 - uv.y;
+    #endif
+    uint2 pixelPosition = id.xy + _SSR_Jitter;
 
-    float2 sampleUV = _SSR_UVWPdf.SampleLevel(sampler_linear_clamp, uv, 0).xy;
-    float SSRMask = _SSR_ColorMask.SampleLevel(sampler_linear_clamp, uv, 0).a;
+    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, uv, 0).r;
 
-    float4 sceneColor = _SSR_SceneColor_RT.SampleLevel(sampler_linear_clamp, uv, 0);
-    float4 sampleColor = _SSR_FinalColor.SampleLevel(sampler_linear_clamp, uv, 0);
+    float3 sceneColor = _SSR_In_SceneColor_RT.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
 
-    half NoV = saturate(dot(worldNormal, -viewDir));
-    float fres = F_Schlick(metallic, NoV);
+    float3 centerColor = _SSR_Spatial_In_RT.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
+    float3 centerNormal = UnpackNormal(_GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0).rgb);
+    float3 centerWorldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP).xyz;
+    
+    // float colorPhi = 1.0f / 3.3f;
+    // float normalPhi = 0.01f / 2.0f ;
+    // float worldPosPhi = 0.5f / 5.5f;
+    float colorPhi = 0.303f;
+    float normalPhi = 0.005f;
+    float worldPosPhi = 0.091f;
 
-    float4 reflectionColor = lerp(sampleColor, sceneColor, saturate(roughness + 0.25)) * fres;
-    // reflectionColor = saturate(lerp(0, reflectionColor, SSRMask));
+    float3 finalColor = float3(0.0, 0.0, 0.0);
+    float weight = 0.0;
+    float weightSum = 0.0;
 
-    _SSR_Out_Combine[id.xy] = sceneColor + reflectionColor;
+    for (int i = 0; i < 25; i++)
+    {
+        float2 offsetUV = uv + offset[i] * invResolution * 1.25;
+        float3 offsetColor = _SSR_Spatial_In_RT.SampleLevel(sampler_linear_clamp, offsetUV, 0).rgb;
+        float3 t = centerColor - offsetColor;
+        float colorWeight = min(exp(-dot(t, t) * colorPhi), 1.0);
+
+        float3 offsetNormal = UnpackNormal(_GBuffer2.SampleLevel(sampler_linear_clamp, offsetUV, 0).rgb);
+        t = centerNormal - offsetNormal;
+        float normalWeight = min(exp(-dot(t, t) * normalPhi), 1.0);
+
+        float3 offsetWorldPos = ComputeWorldSpacePosition(offsetUV, depth, UNITY_MATRIX_I_VP).xyz;
+        t = centerWorldPos - offsetWorldPos;
+        float worldPosWeight = min(exp(-dot(t, t) * worldPosPhi), 1.0);
+
+        weight = colorWeight * normalWeight * worldPosWeight;
+        finalColor += offsetColor * weight;
+        weightSum += weight;
+    }
+    // _SSR_Spatial_Out_RT[id.xy] = weight / weightSum;
+    _SSR_Spatial_Out_RT[id.xy] = float4(sceneColor + finalColor / weightSum, 1.0);
 }

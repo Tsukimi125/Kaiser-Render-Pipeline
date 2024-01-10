@@ -42,4 +42,31 @@ float2 SnapUVOffset(float2 uv, float2 bufferSize, float2 invBufferSize)
     return round(uv * bufferSize) * invBufferSize;
 }
 
+// GTAO
+
+
+float ComputeDistanceFade(const float distance)
+{
+    return saturate(max(0, distance - 0.5) * 0);
+}
+
+float GTAO_Offsets(uint2 pixelPosition)
+{
+    return 0.25 * (float) ((pixelPosition.y - pixelPosition.x) & 3);
+}
+
+float GTAO_Noise(float2 position)
+{
+    return frac(52.9829189 * frac(dot(position, half2(0.06711056, 0.00583715))));
+}
+
+float IntegrateArc_CosWeight(float2 h, float n)
+{
+    float2 Arc = -cos(2 * h - n) + cos(n) + 2 * h * sin(n);
+    return 0.25 * (Arc.x + Arc.y);
+}
+
+
+
+
 #endif

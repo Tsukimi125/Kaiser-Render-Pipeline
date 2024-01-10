@@ -21,8 +21,6 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
     // static int aoRTId = Shader.PropertyToID("AmbientOcclusionRT");
     static int blueNoiseId = Shader.PropertyToID("_BlueNoiseTexture");
 
-
-
     private RandomSampler randomSampler = new RandomSampler(0, 64);
 
     public AmbientOcclusionRenderPass(AmbientOcclusionSettings settings)
@@ -51,7 +49,7 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
             int combineKernel = settings.computeShader.FindKernel("AO_Combine");
 
             RenderTextureDescriptor descriptor = new RenderTextureDescriptor(
-                width, height, RenderTextureFormat.ARGBFloat, 0, 0);
+                width, height, RenderTextureFormat.Default, 0, 0);
             descriptor.sRGB = false;
             descriptor.enableRandomWrite = true;
 
@@ -94,24 +92,13 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
                 cmd.SetComputeTextureParam(settings.computeShader, combineKernel, "_AO_Out_FinalRT", AO_OutputIDs.Final_RT);
                 cmd.DispatchCompute(settings.computeShader, combineKernel, width / 8, height / 8, 1);
 
-
-            }
-            cmd.EndSample("Combine");
-
-            if (settings.debugMode == AmbientOcclusionSettings.DebugMode.ColorMask)
-            {
-                cmd.Blit(AO_OutputIDs.AO_RT, renderingData.cameraData.renderer.cameraColorTargetHandle);
-            }
-            else
-            {
                 cmd.Blit(AO_OutputIDs.Final_RT, renderingData.cameraData.renderer.cameraColorTargetHandle);
             }
-
+            cmd.EndSample("Combine");
 
             cmd.ReleaseTemporaryRT(AO_OutputIDs.AO_RT);
             cmd.ReleaseTemporaryRT(AO_OutputIDs.Final_RT);
             cmd.ReleaseTemporaryRT(AO_InputIDs.SceneColor);
-
 
         }
         context.ExecuteCommandBuffer(cmd);

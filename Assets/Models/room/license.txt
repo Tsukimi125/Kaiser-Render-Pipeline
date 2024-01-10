@@ -1,0 +1,11 @@
+Model Information:
+* title:	Room
+* source:	https://sketchfab.com/3d-models/room-6417cbc1870a4a1691cca06912ae0369
+* author:	Anex (https://sketchfab.com/anex)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Room" (https://sketchfab.com/3d-models/room-6417cbc1870a4a1691cca06912ae0369) by Anex (https://sketchfab.com/anex) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

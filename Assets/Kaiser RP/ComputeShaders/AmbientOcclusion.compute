@@ -53,6 +53,7 @@ float3 TransformScreenUVToViewSpcae(float2 uv, float linear01Depth)
     float4 cameraFarPlaneRay = float4(uv * 2.0 - 1.0, 1.0, 1.0);
     cameraFarPlaneRay = mul(_AO_InverseProjectionMatrix, cameraFarPlaneRay);
     cameraFarPlaneRay.xyz = cameraFarPlaneRay.xyz;
+    // cameraFarPlaneRay.z *= -1;
     return cameraFarPlaneRay.xyz * linear01Depth;
 }
 
@@ -74,25 +75,34 @@ float3 SampleTangetFromView(float2 uv, float2 dir, float2 invBufferSize, float l
 }
 
 [numthreads(8, 8, 1)]
-void HBAO(uint3 id : SV_DispatchThreadID)
+void HBAO(uint3 id:SV_DispatchThreadID)
 {
     // screen info
     float2 bufferSize = _BufferSize.xy;
     float2 invBufferSize = _BufferSize.zw;
-    float2 screenUV = id.xy / bufferSize;
+    float2 screenUV = (id.xy + 0.5f) * invBufferSize;
     float invAspectRatio = bufferSize.y * invBufferSize.x;
 
     uint2 pixelPosition = uint2(screenUV * bufferSize);
 
     // Depth
-    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_point_clamp, screenUV, 0).r;
+    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, screenUV, 0).r;
+
+    [branch]
+    if (depth == 0.0f)
+    {
+        AmbientOcclusionRT[id.xy] = float4(1.0, 1.0, 1.0, 1.0);
+        return;
+    }
+
     float linearDepth = LinearEyeDepth(depth, _ZBufferParams);
     float linear01Depth = Linear01Depth(depth, _ZBufferParams);
 
 
     float3 positionVS = TransformScreenUVToViewSpcae(screenUV, linear01Depth);
+    
 
-    float2 delta = invBufferSize * 1.2;
+    float2 delta = invBufferSize * 2.20f;
 
     float3 positionLeftVS, positionRightVS, positionTopVS, positionBottonVS;
 
@@ -116,18 +126,27 @@ void HBAO(uint3 id : SV_DispatchThreadID)
     float3 dpdv = MinDiff(positionVS, positionBottonVS, positionTopVS) * invAspectRatio;
 
     uint frameIDMod8 = uint(fmod(_AO_FrameIndex, 8));
+    uint frameIDMod31 = uint(fmod(_AO_FrameIndex, 31));
     uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
-
+    uint2 random_2 = Rand3DPCG16(uint3(pixelPosition, frameIDMod31)).xy;
+    float2 rand2 = Hammersley16(frameIDMod8, 8, random);
+    float2 rand2_2 = Hammersley16(frameIDMod31, 8, random_2);
+    
     // Random (Blue Noise)
-    float3 rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV, 0));
-    rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV + rand.xy + random, 0));
+    float3 rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_clamp, screenUV, 0));
+    rand.xy = clamp(rand2_2, 0.01f, 0.09f);
+    // rand.z = rand2.x;
+    // rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV + rand.xy, 0));
+    // rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV + rand.xz, 0));
+    // rand = normalize(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV + rand.yz, 0));
 
     // uint frameIDMod8 = uint(fmod(_AO_FrameIndex, 8));
     // uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
     // float3 rand = float3(random, saturate(SAMPLE_TEXTURE2D_LOD(_BlueNoiseTexture, sampler_linear_repeat, screenUV + random, 0).r));
     
-    float radiusPixel = 0.5f * _Radius * 0.3f * _BufferSize.x / linearDepth;
-    int _MaxRadiusPixels = 256;
+    // float radiusPixel = 0.5f * _Radius * 0.3f * _BufferSize.x / linearDepth;
+    float radiusPixel = 0.5f * _Radius * 0.3f * _BufferSize.x / 1.0;
+    int _MaxRadiusPixels = 2560;
     float stepSize = min(radiusPixel, _MaxRadiusPixels);
 
     float ao = 0.0;
@@ -157,22 +176,31 @@ void HBAO(uint3 id : SV_DispatchThreadID)
         {
             float angle = stepAngle * d;
             float2 dir = RotateDirections(float2(cos(angle), sin(angle)), rand.xy);
-            float2 deltaUV = dir * stepSizeUV;
+            float2 deltaUV = dir * stepSizeUV * (0.75f.xx + 0.5f.xx * rand.xy);
 
-            float2 uv = screenUV + SnapUVOffset(rand.xy * deltaUV, bufferSize, invBufferSize);
-            deltaUV = SnapUVOffset(deltaUV, bufferSize, invBufferSize);
+            float2 uv = screenUV + deltaUV;
+            // float2 uv = screenUV + SnapUVOffset(deltaUV, bufferSize, invBufferSize);
+            // deltaUV = SnapUVOffset(deltaUV, bufferSize, invBufferSize);
             float3 T = dpdu * deltaUV.x + dpdv * deltaUV.y;
             // T = normalize(T);
             
-            float tanT = GetTan(T) + 0.1f;
+            float tanT = GetTan(T) + 0.15f;
             float sinT = TanToSin(tanT);
-            // AmbientOcclusionRT[id.xy] = float4(normalize(T), 1);
+            // AmbientOcclusionRT[id.xy] = sinT;
+            // return;
             
             [loop]
             for (int s = 1; s <= _SampleCount; s++)
             {
                 uv += deltaUV;
                 float sampleDepth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_point_clamp, uv, 0).r;
+
+                [branch]
+                if (sampleDepth == 0.0f)
+                {
+                    break;
+                }
+
                 float sample01Depth = Linear01Depth(sampleDepth, _ZBufferParams);
                 float3 samplePositionVS = TransformScreenUVToViewSpcae(uv, sample01Depth);
                 float3 H = samplePositionVS - positionVS;
@@ -181,13 +209,20 @@ void HBAO(uint3 id : SV_DispatchThreadID)
 
                 // float sinH = TanToSin(tanH);
 
+
+
+                [branch]
                 if (dist < _Radius)
                 {
                     float sinH = TanToSin(tanH);
-                    ao += FallOff(dist, _Radius) * (saturate(sinH) - saturate(sinT));
-                    // ao += (sinH - sinT) * FallOff(dist);
+                    // ao += FallOff(dist, _Radius) * clamp(sinH - sinT, -1.0, 1.0);
+                    ao += FallOff(dist, _Radius) * (sinH - sinT);
+                    // ao += FallOff(dist, _Radius) * clamp(sinH, 0.0, 1.0);
+                    // ao += sinH;
+                    // ao += (sinH - sinT) * FallOff(dist, _Radius);
 
                 }
+
 
                 // if (dist < _Radius && tanH > tanT) {
                 //     float sinH = TanToSin(tanH);
@@ -209,12 +244,15 @@ void HBAO(uint3 id : SV_DispatchThreadID)
             }
         }
     }
+    // AmbientOcclusionRT[id.xy] = float4(positionVS, 0.0);
+    // AmbientOcclusionRT[id.xy] = float4(rand.xy, 0.0, 0.0);
     // AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
-    AmbientOcclusionRT[id.xy] = depth;
+    // AmbientOcclusionRT[id.xy] = ao;
+    AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
 }
 
 [numthreads(8, 8, 1)]
-void GTAO(uint3 id : SV_DispatchThreadID)
+void GTAO(uint3 id:SV_DispatchThreadID)
 {
 
 }
@@ -224,7 +262,7 @@ Texture2D<float4> _AO_In_SceneColorRT;
 RWTexture2D<float4> _AO_Out_FinalRT;
 
 [numthreads(8, 8, 1)]
-void AO_Combine(uint3 id : SV_DispatchThreadID)
+void AO_Combine(uint3 id:SV_DispatchThreadID)
 {
     float2 resolution = _BufferSize.xy;
     float2 invResolution = _BufferSize.zw;
@@ -233,6 +271,7 @@ void AO_Combine(uint3 id : SV_DispatchThreadID)
     float3 sceneColor = SAMPLE_TEXTURE2D_LOD(_AO_In_SceneColorRT, sampler_linear_clamp, uv, 0).rgb;
     float3 ao = SAMPLE_TEXTURE2D_LOD(_AO_In_AmbientOcclusionRT, sampler_linear_clamp, uv, 0).rgb;
     
-    _AO_Out_FinalRT[id.xy] = float4(sceneColor * ao, 1.0);
+    _AO_Out_FinalRT[id.xy] = float4(1.0 * ao, 1.0);
     // _AO_Out_FinalRT[id.xy] = float4(1.0, 0.0, 0.0, 1.0);
+
 }
