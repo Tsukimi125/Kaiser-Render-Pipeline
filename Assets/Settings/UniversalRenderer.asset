@@ -14,10 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Active: 1
   settings:
-    reflectionType: 0
+    reflectionType: 3
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
-    resolution: 1
+    resolution: 0
     blueNoise: {fileID: 2800000, guid: bc05168357e480443aa527380a6402a7, type: 3}
+    smoothMultiplier: 1
+    intensity: 1.5
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -101,14 +103,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 383388d925bbc7645bdf98a5c98a8dae, type: 3}
   m_Name: KaiserAmbientOcclusion
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     passEvent: 550
     computeShader: {fileID: 7200000, guid: 62b7b830229fa9d4fbeec480ada00b39, type: 3}
     blueNoiseTexture: {fileID: 2800000, guid: 890284e1b7e4dc341992e5c8f92dfe1b, type: 3}
     aoType: 1
-    intensity: 1.31
-    aoRadius: 2.3
+    intensity: 2.03
+    aoRadius: 6.1
     maxDistance: 0
-    directionCount: 6
-    sampleCount: 4
+    directionCount: 5
+    sampleCount: 32

@@ -55,14 +55,13 @@ public class ReflectionRenderPass : ScriptableRenderPass
 
     public void InitializeRTHandles(int width, int height)
     {
-        RenderTextureDescriptor descriptor = new RenderTextureDescriptor(width, height, RenderTextureFormat.ARGB32, 0);
+        RenderTextureDescriptor descriptor = new RenderTextureDescriptor(width, height, RenderTextureFormat.ARGB64, 0);
         descriptor.enableRandomWrite = true;
 
         RenderingUtils.ReAllocateIfNeeded(ref Reflection_Output.ColorMask, descriptor, FilterMode.Point, TextureWrapMode.Clamp, name: "_SSR_RT");
         RenderingUtils.ReAllocateIfNeeded(ref Reflection_Output.TemporalPrev, descriptor, FilterMode.Point, TextureWrapMode.Clamp, name: "_SSR_HistoryBuffer0_RT");
         RenderingUtils.ReAllocateIfNeeded(ref Reflection_Output.TemporalCurr, descriptor, FilterMode.Point, TextureWrapMode.Clamp, name: "_SSR_HistoryBuffer1_RT");
         RenderingUtils.ReAllocateIfNeeded(ref Reflection_Output.SpatialOut, descriptor, FilterMode.Point, TextureWrapMode.Clamp, name: "_SSR_SpatialOut_RT");
-
     }
 
     public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
@@ -108,6 +107,12 @@ public class ReflectionRenderPass : ScriptableRenderPass
 
             // cmd.SetComputeMatrixParam(settings.computeShader, "_SSR_PrevViewProjMatrix", renderingData.cameraData.camera.previousViewProjectionMatrix);
 
+
+
+            cmd.SetComputeFloatParam(settings.computeShader, "_SSR_SmoothMultiplier", settings.smoothMultiplier);
+            cmd.SetComputeFloatParam(settings.computeShader, "_SSR_Intensity", settings.intensity);
+
+
             cmd.SetComputeVectorParam(settings.computeShader, "_SSR_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
             cmd.SetComputeIntParam(settings.computeShader, "_SSR_FrameIndex", randomSampler.frameIndex);
             cmd.SetComputeVectorParam(settings.computeShader, "_SSR_Jitter", randomSampler.GetRandomOffset());
@@ -130,11 +135,17 @@ public class ReflectionRenderPass : ScriptableRenderPass
             cmd.SetComputeTextureParam(settings.computeShader, k3, "_SSR_Spatial_Out_RT", Reflection_Output.SpatialOut);
             cmd.DispatchCompute(settings.computeShader, k3, threadGroupsX, threadGroupsY, 1);
             // Blitter.BlitCameraTexture(cmd, Reflection_Output.ColorMask, renderingData.cameraData.renderer.cameraColorTargetHandle);
-            Blitter.BlitCameraTexture(cmd, Reflection_Output.SpatialOut, renderingData.cameraData.renderer.cameraColorTargetHandle);
+
+            if (settings.reflectionType == KaiserReflection.ReflectionType.DebugColorMask)
+                Blitter.BlitCameraTexture(cmd, Reflection_Output.ColorMask, renderingData.cameraData.renderer.cameraColorTargetHandle);
+            else if (settings.reflectionType == KaiserReflection.ReflectionType.DebugTemporal)
+                Blitter.BlitCameraTexture(cmd, Reflection_Output.TemporalCurr, renderingData.cameraData.renderer.cameraColorTargetHandle);
+            else if (settings.reflectionType == KaiserReflection.ReflectionType.DebugSpatial)
+                Blitter.BlitCameraTexture(cmd, Reflection_Output.SpatialOut, renderingData.cameraData.renderer.cameraColorTargetHandle);
+            else
+                Blitter.BlitCameraTexture(cmd, Reflection_Output.SpatialOut, renderingData.cameraData.renderer.cameraColorTargetHandle);
+
             // Blitter.BlitCameraTexture(cmd, Reflection_Output.HistoryBuffer[(historyIndex + 1) % 2], Reflection_Output.HistoryBuffer[historyIndex]);
-
-
-
         }
 
         // if (Reflection_Output.ColorMask != null)

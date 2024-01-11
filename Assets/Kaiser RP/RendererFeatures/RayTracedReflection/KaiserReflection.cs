@@ -10,7 +10,9 @@ public class KaiserReflection : ScriptableRendererFeature
     public enum ReflectionType
     {
         StochasticSSR,
-        RayTraced,
+        DebugColorMask,
+        DebugTemporal,
+        DebugSpatial
     }
     public enum Resolution
     {
@@ -26,6 +28,10 @@ public class KaiserReflection : ScriptableRendererFeature
         public ComputeShader computeShader;
         public Resolution resolution = Resolution.Half;
         public Texture2D blueNoise;
+        [Range(0, 1)]
+        public float smoothMultiplier = 0.0f;
+        [Range(0.1f, 10f)]
+        public float intensity = 1.0f;
 
         // public RayTracingShader rayTracingShader;
     }

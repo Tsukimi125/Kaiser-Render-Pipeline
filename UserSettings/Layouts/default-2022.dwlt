@@ -19,7 +19,7 @@ MonoBehaviour:
     width: 2048
     height: 1068.8
   m_ShowMode: 4
-  m_Title: Hierarchy
+  m_Title: Game
   m_RootView: {fileID: 2}
   m_MinSize: {x: 875, y: 300}
   m_MaxSize: {x: 10000, y: 10000}
@@ -121,7 +121,7 @@ MonoBehaviour:
   m_MinSize: {x: 400, y: 100}
   m_MaxSize: {x: 32384, y: 16192}
   vertical: 0
-  controlID: 50
+  controlID: 122
 --- !u!114 &6
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -146,7 +146,7 @@ MonoBehaviour:
   m_MinSize: {x: 100, y: 100}
   m_MaxSize: {x: 8096, y: 16192}
   vertical: 1
-  controlID: 27
+  controlID: 29
 --- !u!114 &7
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -272,8 +272,8 @@ MonoBehaviour:
     y: 0
     width: 532.80005
     height: 1018.80005
-  m_MinSize: {x: 276, y: 71}
-  m_MaxSize: {x: 4001, y: 4021}
+  m_MinSize: {x: 275, y: 50}
+  m_MaxSize: {x: 4000, y: 4000}
   m_ActualView: {fileID: 18}
   m_Panes:
   - {fileID: 18}
@@ -417,8 +417,8 @@ MonoBehaviour:
       floating: 0
       collapsed: 0
       displayed: 1
-      snapOffset: {x: -162.85718, y: -26.713013}
-      snapOffsetDelta: {x: -1.94281, y: 0}
+      snapOffset: {x: -164.79999, y: -26.713013}
+      snapOffsetDelta: {x: 0, y: 0}
       snapCorner: 3
       id: Tool Settings
       index: 0
@@ -761,9 +761,9 @@ MonoBehaviour:
   m_PlayAudio: 0
   m_AudioPlay: 0
   m_Position:
-    m_Target: {x: -4.284031, y: 0.061581135, z: -0.67805195}
+    m_Target: {x: 5.810526, y: -0.01841402, z: -5.1420374}
     speed: 2
-    m_Value: {x: -4.284031, y: 0.061581135, z: -0.67805195}
+    m_Value: {x: 5.810526, y: -0.01841402, z: -5.1420374}
   m_RenderMode: 0
   m_CameraMode:
     drawMode: 0
@@ -809,13 +809,13 @@ MonoBehaviour:
     m_GridAxis: 1
     m_gridOpacity: 0.5
   m_Rotation:
-    m_Target: {x: 0.02685805, y: -0.94378746, z: 0.07910211, w: 0.31997168}
+    m_Target: {x: -0.0029701106, y: -0.9909486, z: 0.13271157, w: -0.022432543}
     speed: 2
-    m_Value: {x: -0.026856776, y: 0.9437427, z: -0.07909836, w: -0.3199565}
+    m_Value: {x: -0.002969957, y: -0.99089736, z: 0.1327047, w: -0.022431383}
   m_Size:
-    m_Target: 6.5028467
+    m_Target: 8.143735
     speed: 2
-    m_Value: 6.5028467
+    m_Value: 8.143735
   m_Ortho:
     m_Target: 0
     speed: 2
@@ -967,24 +967,24 @@ MonoBehaviour:
     m_OverlaysVisible: 1
   m_SceneHierarchy:
     m_TreeViewState:
-      scrollPos: {x: 0, y: 0}
-      m_SelectedIDs: 
+      scrollPos: {x: 0, y: 879.19995}
+      m_SelectedIDs: cc060000
       m_LastClickedID: 0
-      m_ExpandedIDs: 823ffeff
+      m_ExpandedIDs: 2284f1ff3e84f1ff5a84f1ff2285f1ffe286f1ff628bf1ff668bf1ff6a8bf1ff6e8bf1ff728bf1ff768bf1ff7a8bf1ff808cf1ff1c90f1ff2a92f1ff5698f1ff5a98f1ff5e98f1ff6298f1fffc98f1ff86a6f1ff700ef2ff28eaffff44eaffff80ebffff90ebffffe8ecffff68f1ffff6cf1ffff70f1ffff74f1ffff78f1ffff7cf1ffff80f1ffff82f1ffff3af3ffff8cf6ffff22fbffff
       m_RenameOverlay:
         m_UserAcceptedRename: 0
-        m_Name: 
-        m_OriginalName: 
+        m_Name: Modern Living Room_Structure_Windows_0
+        m_OriginalName: Modern Living Room_Structure_Windows_0
         m_EditFieldRect:
           serializedVersion: 2
           x: 0
           y: 0
           width: 0
           height: 0
-        m_UserData: 0
+        m_UserData: -944046
         m_IsWaitingForDelay: 0
         m_IsRenaming: 0
-        m_OriginalEventType: 11
+        m_OriginalEventType: 0
         m_IsRenamingFilename: 0
         m_ClientGUIView: {fileID: 9}
       m_SearchString: 
@@ -1038,7 +1038,8 @@ MonoBehaviour:
     m_ShowAllHits: 0
     m_SkipHidden: 0
     m_SearchArea: 1
-    m_Folders: []
+    m_Folders:
+    - Assets/Settings
     m_Globs: []
     m_OriginalText: 
     m_ImportLogFlags: 0
@@ -1054,7 +1055,7 @@ MonoBehaviour:
     scrollPos: {x: 0, y: 0}
     m_SelectedIDs: 14c40000
     m_LastClickedID: 50196
-    m_ExpandedIDs: 
+    m_ExpandedIDs: 0000000016730000187300001a7300001c7300001e73000020730000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1082,7 +1083,7 @@ MonoBehaviour:
     scrollPos: {x: 0, y: 0}
     m_SelectedIDs: 
     m_LastClickedID: 0
-    m_ExpandedIDs: ffffffff0e060000
+    m_ExpandedIDs: ffffffff0000000016730000187300001a7300001c7300001e730000207300005075000058750000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
