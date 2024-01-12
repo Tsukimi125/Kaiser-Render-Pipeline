@@ -37,7 +37,7 @@ namespace UnityEngine.Rendering.Universal
             return matrix;
         }
 
-        public static void  EnsureArray<T>(ref T[] array, int size, T initialValue = default(T))
+        public static void EnsureArray<T>(ref T[] array, int size, T initialValue = default(T))
         {
             if (array == null || array.Length != size)
             {
@@ -59,6 +59,7 @@ namespace UnityEngine.Rendering.Universal
                 rt = RenderTexture.GetTemporary(width, height, depthBits, format, RenderTextureReadWrite.Default, antiAliasing);
                 rt.filterMode = filterMode;
                 rt.wrapMode = TextureWrapMode.Clamp;
+                Debug.Log("Reallocate RT");
             }
         }
     }

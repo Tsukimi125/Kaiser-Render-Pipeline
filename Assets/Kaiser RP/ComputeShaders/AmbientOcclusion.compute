@@ -19,6 +19,7 @@
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 RWTexture2D<float4> AmbientOcclusionRT;
+Texture2D<float4> _AO_PrevTexture;
 Texture2D<float3> _BlueNoiseTexture;
 // RWTexture2D<float3> normalTexture;
 float _Intensity;
@@ -43,6 +44,7 @@ SAMPLER(sampler_linear_repeat);
 
 float4x4 _AO_ProjectionMatrix;
 float4x4 _AO_InverseProjectionMatrix;
+
 
 
 float _AngleBias = 0.1f * PI;
@@ -248,7 +250,10 @@ void HBAO(uint3 id:SV_DispatchThreadID)
     // AmbientOcclusionRT[id.xy] = float4(rand.xy, 0.0, 0.0);
     // AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / _DirectionCount;
     // AmbientOcclusionRT[id.xy] = ao;
-    AmbientOcclusionRT[id.xy] = 1 - ao * _Intensity / _SampleCount / dirCount;
+    float currAO = ao * _Intensity / _SampleCount / dirCount;
+    float prevAO = SAMPLE_TEXTURE2D_LOD(_AO_PrevTexture, sampler_linear_clamp, screenUV, 0).r;
+    float blendFactor = 0.95f;
+    AmbientOcclusionRT[id.xy] = prevAO * blendFactor + currAO * (1 - blendFactor);
 }
 
 [numthreads(8, 8, 1)]
@@ -272,7 +277,7 @@ void AO_Combine(uint3 id:SV_DispatchThreadID)
     float3 ao = SAMPLE_TEXTURE2D_LOD(_AO_In_AmbientOcclusionRT, sampler_linear_clamp, uv, 0).rgb;
     
     // _AO_Out_FinalRT[id.xy] = float4(sceneColor * ao, 1.0);
-    _AO_Out_FinalRT[id.xy] = float4(1.0f * ao, 1.0);
+    _AO_Out_FinalRT[id.xy] = float4(1.0f * (1.0f - ao), 1.0);
     // _AO_Out_FinalRT[id.xy] = float4(1.0, 0.0, 0.0, 1.0);
 
 }

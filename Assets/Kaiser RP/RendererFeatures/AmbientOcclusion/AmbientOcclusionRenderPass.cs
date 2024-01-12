@@ -14,13 +14,12 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
     }
     public class AO_OutputIDs
     {
-
         public static int AO_RT = Shader.PropertyToID("AmbientOcclusionRT");
         public static int Final_RT = Shader.PropertyToID("FinalRT");
-
     }
 
-    public RenderTexture[] historyBuffer;
+    public static int historyIndex1 = Shader.PropertyToID("_AO_Texture1");
+    public static int historyIndex2 = Shader.PropertyToID("_AO_Texture2");
     public static int s_IndexWrite = 0;
     // static int aoRTId = Shader.PropertyToID("AmbientOcclusionRT");
     static int blueNoiseId = Shader.PropertyToID("_BlueNoiseTexture");
@@ -57,15 +56,19 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
 
             var camera = renderingData.cameraData.camera;
             var colorTextureIdentifier = renderingData.cameraData.renderer.cameraColorTargetHandle;
-            var descriptor = new RenderTextureDescriptor(camera.scaledPixelWidth, camera.scaledPixelHeight, RenderTextureFormat.ARGB64, 16);
+            var descriptor = new RenderTextureDescriptor(camera.scaledPixelWidth, camera.scaledPixelHeight, RenderTextureFormat.ARGB64, 16)
+            {
+                enableRandomWrite = true
+            };
 
-            TAAUtils.EnsureArray(ref historyBuffer, 2);
-            TAAUtils.EnsureRenderTarget(ref historyBuffer[0], descriptor.width, descriptor.height, descriptor.colorFormat, FilterMode.Bilinear);
-            TAAUtils.EnsureRenderTarget(ref historyBuffer[1], descriptor.width, descriptor.height, descriptor.colorFormat, FilterMode.Bilinear);
+            // TAAUtils.EnsureArray(ref historyBuffer, 2);
+            // TAAUtils.EnsureRenderTarget(ref historyBuffer[0], descriptor.width, descriptor.height, descriptor.colorFormat, FilterMode.Bilinear);
+            // TAAUtils.EnsureRenderTarget(ref historyBuffer[1], descriptor.width, descriptor.height, descriptor.colorFormat, FilterMode.Bilinear);
+            // historyBuffer[0].enableRandomWrite = true;
+            // historyBuffer[1].enableRandomWrite = true;
 
-            int indexRead = s_IndexWrite;
-            s_IndexWrite = ++s_IndexWrite % 2;
-
+            cmd.GetTemporaryRT(historyIndex1, descriptor);
+            cmd.GetTemporaryRT(historyIndex2, descriptor);
             cmd.GetTemporaryRT(AO_InputIDs.SceneColor, descriptor);
             cmd.GetTemporaryRT(AO_OutputIDs.AO_RT, descriptor);
             cmd.GetTemporaryRT(AO_OutputIDs.Final_RT, descriptor);
@@ -86,9 +89,14 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
                 cmd.SetComputeIntParam(settings.computeShader, "_AO_FrameIndex", randomSampler.frameIndex);
 
                 cmd.SetComputeTextureParam(settings.computeShader, hbaoKernel, "_BlueNoiseTexture", settings.blueNoiseTexture);
-                cmd.SetComputeTextureParam(settings.computeShader, hbaoKernel, "AmbientOcclusionRT", AO_OutputIDs.AO_RT);
+                // cmd.SetComputeTextureParam(settings.computeShader, hbaoKernel, "AmbientOcclusionRT", AO_OutputIDs.AO_RT);
+                cmd.SetComputeTextureParam(settings.computeShader, hbaoKernel, "_AO_PrevTexture", historyIndex1);
+                cmd.SetComputeTextureParam(settings.computeShader, hbaoKernel, "AmbientOcclusionRT", historyIndex2);
+
+
 
                 cmd.DispatchCompute(settings.computeShader, hbaoKernel, width / 8, height / 8, 1);
+
                 // cmd.SetGlobalTexture("AmbientOcclusionRT", aoRTId);\
             }
             cmd.EndSample("Compute AO");
@@ -100,7 +108,7 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
                 // RWTexture2D<float4> _AO_Out_FinalRT;
                 // cmd.Blit(renderingData.cameraData.renderer.cameraColorTargetHandle, AO_InputIDs.SceneColor);
                 cmd.Blit(Shader.GetGlobalTexture("_BlitTexture"), AO_InputIDs.SceneColor);
-                cmd.SetComputeTextureParam(settings.computeShader, combineKernel, "_AO_In_AmbientOcclusionRT", AO_OutputIDs.AO_RT);
+                cmd.SetComputeTextureParam(settings.computeShader, combineKernel, "_AO_In_AmbientOcclusionRT", historyIndex1);
                 cmd.SetComputeTextureParam(settings.computeShader, combineKernel, "_AO_In_SceneColorRT", AO_InputIDs.SceneColor);
                 cmd.SetComputeTextureParam(settings.computeShader, combineKernel, "_AO_Out_FinalRT", AO_OutputIDs.Final_RT);
                 cmd.DispatchCompute(settings.computeShader, combineKernel, width / 8, height / 8, 1);
@@ -108,6 +116,10 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
                 cmd.Blit(AO_OutputIDs.Final_RT, renderingData.cameraData.renderer.cameraColorTargetHandle);
             }
             cmd.EndSample("Combine");
+
+            // swap
+            cmd.CopyTexture(historyIndex2, historyIndex1);
+
 
             cmd.ReleaseTemporaryRT(AO_OutputIDs.AO_RT);
             cmd.ReleaseTemporaryRT(AO_OutputIDs.Final_RT);
