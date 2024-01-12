@@ -14,10 +14,14 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
     }
     public class AO_OutputIDs
     {
+
         public static int AO_RT = Shader.PropertyToID("AmbientOcclusionRT");
         public static int Final_RT = Shader.PropertyToID("FinalRT");
 
     }
+
+    public RenderTexture[] historyBuffer;
+    public static int s_IndexWrite = 0;
     // static int aoRTId = Shader.PropertyToID("AmbientOcclusionRT");
     static int blueNoiseId = Shader.PropertyToID("_BlueNoiseTexture");
 
@@ -39,6 +43,9 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
     {
         var cmd = CommandBufferPool.Get();
         randomSampler.RefreshFrame();
+
+
+
         using (new ProfilingScope(cmd, profilingSampler))
         {
             // Prepare
@@ -48,10 +55,16 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
             int hbaoKernel = settings.computeShader.FindKernel("HBAO");
             int combineKernel = settings.computeShader.FindKernel("AO_Combine");
 
-            RenderTextureDescriptor descriptor = new RenderTextureDescriptor(
-                width, height, RenderTextureFormat.Default, 0, 0);
-            descriptor.sRGB = false;
-            descriptor.enableRandomWrite = true;
+            var camera = renderingData.cameraData.camera;
+            var colorTextureIdentifier = renderingData.cameraData.renderer.cameraColorTargetHandle;
+            var descriptor = new RenderTextureDescriptor(camera.scaledPixelWidth, camera.scaledPixelHeight, RenderTextureFormat.ARGB64, 16);
+
+            TAAUtils.EnsureArray(ref historyBuffer, 2);
+            TAAUtils.EnsureRenderTarget(ref historyBuffer[0], descriptor.width, descriptor.height, descriptor.colorFormat, FilterMode.Bilinear);
+            TAAUtils.EnsureRenderTarget(ref historyBuffer[1], descriptor.width, descriptor.height, descriptor.colorFormat, FilterMode.Bilinear);
+
+            int indexRead = s_IndexWrite;
+            s_IndexWrite = ++s_IndexWrite % 2;
 
             cmd.GetTemporaryRT(AO_InputIDs.SceneColor, descriptor);
             cmd.GetTemporaryRT(AO_OutputIDs.AO_RT, descriptor);

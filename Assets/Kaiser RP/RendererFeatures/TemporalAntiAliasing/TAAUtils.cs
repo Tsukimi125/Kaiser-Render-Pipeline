@@ -37,7 +37,7 @@ namespace UnityEngine.Rendering.Universal
             return matrix;
         }
 
-        public static void EnsureArray<T>(ref T[] array, int size, T initialValue = default(T))
+        public static void  EnsureArray<T>(ref T[] array, int size, T initialValue = default(T))
         {
             if (array == null || array.Length != size)
             {

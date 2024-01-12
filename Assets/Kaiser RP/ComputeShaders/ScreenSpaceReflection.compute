@@ -45,7 +45,7 @@ float4x4 _SSR_PrevViewProjMatrix;
 
 float2 _SSR_Jitter;
 
-float _SSR_SmootherMultiplier;
+float _SSR_SmoothMultiplier;
 float _SSR_Intensity;
 
 RWTexture2D<float4> _SSR_ColorMask_RT;
@@ -80,7 +80,7 @@ void SSR_RayTracing_Linear(uint3 id:SV_DispatchThreadID)
     half3 F0 = 0.04f.xxx;
     half3 albedo = _GBuffer0.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
     F0 = lerp(F0, albedo, metallic);
-    F0 = lerp(F0, 1.0f.xxx, _SSR_SmootherMultiplier);
+    F0 = lerp(F0, 1.0f.xxx, _SSR_SmoothMultiplier);
 
     float3 worldNormal = UnpackNormal(gbuffer2.xyz);
     float3 viewNormal = TransformWorldToViewNormal(worldNormal);

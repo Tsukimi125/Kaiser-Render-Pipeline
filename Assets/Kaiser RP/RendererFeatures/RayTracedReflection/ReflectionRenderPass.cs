@@ -11,7 +11,6 @@ public class ReflectionRenderPass : ScriptableRenderPass
 {
     private readonly KaiserReflection.Settings settings;
     private readonly RandomSampler randomSampler;
-    public static RTHandle ColorMask;
     private class Reflection_Output
     {
         // public static int ColorMask = Shader.PropertyToID("SSR_ColorMask");
@@ -162,9 +161,9 @@ public class ReflectionRenderPass : ScriptableRenderPass
     }
     public void Dispose()
     {
-        // Reflection_Output.ColorMask?.Release();
-        // Reflection_Output.TemporalPrev?.Release();
-        // Reflection_Output.TemporalCurr?.Release();
+        Reflection_Output.ColorMask?.Release();
+        Reflection_Output.TemporalPrev?.Release();
+        Reflection_Output.TemporalCurr?.Release();
     }
     // public override void FrameCleanup(CommandBuffer cmd)
     // {
