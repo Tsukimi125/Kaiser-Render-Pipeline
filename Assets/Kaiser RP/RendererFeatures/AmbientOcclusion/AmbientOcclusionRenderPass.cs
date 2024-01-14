@@ -108,7 +108,7 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
                 // RWTexture2D<float4> _AO_Out_FinalRT;
                 // cmd.Blit(renderingData.cameraData.renderer.cameraColorTargetHandle, AO_InputIDs.SceneColor);
                 cmd.Blit(Shader.GetGlobalTexture("_BlitTexture"), AO_InputIDs.SceneColor);
-                cmd.SetComputeTextureParam(settings.computeShader, combineKernel, "_AO_In_AmbientOcclusionRT", historyIndex1);
+                cmd.SetComputeTextureParam(settings.computeShader, combineKernel, "_AO_In_AmbientOcclusionRT", historyIndex2);
                 cmd.SetComputeTextureParam(settings.computeShader, combineKernel, "_AO_In_SceneColorRT", AO_InputIDs.SceneColor);
                 cmd.SetComputeTextureParam(settings.computeShader, combineKernel, "_AO_Out_FinalRT", AO_OutputIDs.Final_RT);
                 cmd.DispatchCompute(settings.computeShader, combineKernel, width / 8, height / 8, 1);

@@ -111,7 +111,7 @@ public class ReflectionRenderPass : ScriptableRenderPass
             cmd.SetComputeFloatParam(settings.computeShader, "_SSR_SmoothMultiplier", settings.smoothMultiplier);
             cmd.SetComputeFloatParam(settings.computeShader, "_SSR_Intensity", settings.intensity);
 
-
+            
             cmd.SetComputeVectorParam(settings.computeShader, "_SSR_BufferSize", new Vector4(width, height, 1.0f / width, 1.0f / height));
             cmd.SetComputeIntParam(settings.computeShader, "_SSR_FrameIndex", randomSampler.frameIndex);
             cmd.SetComputeVectorParam(settings.computeShader, "_SSR_Jitter", randomSampler.GetRandomOffset());

@@ -16,7 +16,10 @@ public class KaiserAmbientOcclusion : ScriptableRendererFeature
         // throw new System.NotImplementedException();
         // hbaoRenderPass.Setup(settings);
         // hbaoRenderPass.cameraColorTarget = renderer.cameraColorTarget;
-        renderer.EnqueuePass(aoRenderPass);
+        if (renderingData.cameraData.camera.cameraType == CameraType.Game)
+        {
+            renderer.EnqueuePass(aoRenderPass);
+        }
     }
 
     public override void Create()
