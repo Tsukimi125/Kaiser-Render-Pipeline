@@ -93,17 +93,15 @@ void HBAO(uint3 id:SV_DispatchThreadID)
     [branch]
     if (depth <= 0.01f)
     {
-        AmbientOcclusionRT[id.xy] = float4(1.0, 1.0, 1.0, 1.0);
+        AmbientOcclusionRT[id.xy] = float4(0.0, 0.0, 0.0, 0.0);
         return;
     }
 
     float linearDepth = LinearEyeDepth(depth, _ZBufferParams);
     float linear01Depth = Linear01Depth(depth, _ZBufferParams);
 
-
     float3 positionVS = TransformScreenUVToViewSpcae(screenUV, linear01Depth);
     
-
     float2 delta = invBufferSize * 1.2f;
 
     float3 positionLeftVS, positionRightVS, positionTopVS, positionBottonVS;
@@ -252,6 +250,7 @@ void HBAO(uint3 id:SV_DispatchThreadID)
     // AmbientOcclusionRT[id.xy] = ao;
     float currAO = ao * _Intensity / _SampleCount / dirCount;
     float prevAO = SAMPLE_TEXTURE2D_LOD(_AO_PrevTexture, sampler_linear_clamp, screenUV, 0).r;
+    // float prevAO = AmbientOcclusionRT[id.xy].r;
     float blendFactor = 0.95f;
     AmbientOcclusionRT[id.xy] = prevAO * blendFactor + currAO * (1 - blendFactor);
 }
