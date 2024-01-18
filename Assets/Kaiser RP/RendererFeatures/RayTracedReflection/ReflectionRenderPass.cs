@@ -54,7 +54,7 @@ public class ReflectionRenderPass : ScriptableRenderPass
 
     public void InitializeRTHandles(int width, int height)
     {
-        RenderTextureDescriptor descriptor = new RenderTextureDescriptor(width, height, RenderTextureFormat.ARGB64, 0);
+        RenderTextureDescriptor descriptor = new RenderTextureDescriptor(width, height, RenderTextureFormat.DefaultHDR, 0);
         descriptor.enableRandomWrite = true;
 
         RenderingUtils.ReAllocateIfNeeded(ref Reflection_Output.ColorMask, descriptor, FilterMode.Point, TextureWrapMode.Clamp, name: "_SSR_RT");
