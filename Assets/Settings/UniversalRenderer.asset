@@ -1,5 +1,20 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-3533370709736002669
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b46513145fcdeb469276e68a5fb807e, type: 3}
+  m_Name: ScreenSpaceReflection
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  m_Shader: {fileID: 4800000, guid: b839decee17742a418cb184f6ba33c78, type: 3}
+  m_Intensity: 1.5
 --- !u!114 &-2393621732099550697
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12,7 +27,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb81397b7ce75d943bd70c8072182333, type: 3}
   m_Name: KaiserReflection
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   settings:
     reflectionType: 3
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
@@ -40,8 +55,8 @@ MonoBehaviour:
   - {fileID: 6731091686167471330}
   - {fileID: 7714929738604356867}
   - {fileID: 455308206691208832}
-  - {fileID: 2960142106831451078}
-  m_RendererFeatureMap: 17128d73b725c8dee2e498c839a4695d03259cc8b8ef106b804e26d366945106c6735d0a90891429
+  - {fileID: -3533370709736002669}
+  m_RendererFeatureMap: 17128d73b725c8dee2e498c839a4695d03259cc8b8ef106b804e26d366945106936b6a620ff2f6ce
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -94,7 +109,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Active: 0
   m_Settings:
-    AOMethod: 0
+    AOMethod: 1
     Downsample: 1
     AfterOpaque: 0
     Source: 1
@@ -148,23 +163,6 @@ MonoBehaviour:
     DebugMotionVectors: 0
     DebugReprojection: 0
     DebugAlbedo: 0
---- !u!114 &2960142106831451078
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6d613f08f173d4dd895bb07b3230baa9, type: 3}
-  m_Name: FullScreenPassRendererFeature
-  m_EditorClassIdentifier: 
-  m_Active: 0
-  passMaterial: {fileID: 2100000, guid: 78a08787ca30045abb69f6f7dd878e09, type: 2}
-  injectionPoint: 600
-  requirements: 12
-  passIndex: 0
 --- !u!114 &6731091686167471330
 MonoBehaviour:
   m_ObjectHideFlags: 0
