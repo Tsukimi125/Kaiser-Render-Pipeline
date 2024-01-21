@@ -19,7 +19,7 @@ MonoBehaviour:
     resolution: 0
     blueNoise: {fileID: 2800000, guid: bc05168357e480443aa527380a6402a7, type: 3}
     smoothMultiplier: 0
-    intensity: 3.64
+    intensity: 3.04
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -160,7 +160,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6d613f08f173d4dd895bb07b3230baa9, type: 3}
   m_Name: FullScreenPassRendererFeature
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   passMaterial: {fileID: 2100000, guid: 78a08787ca30045abb69f6f7dd878e09, type: 2}
   injectionPoint: 600
   requirements: 12
