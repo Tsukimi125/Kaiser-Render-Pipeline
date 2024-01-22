@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b46513145fcdeb469276e68a5fb807e, type: 3}
   m_Name: ScreenSpaceReflection
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   m_Shader: {fileID: 4800000, guid: b839decee17742a418cb184f6ba33c78, type: 3}
   m_Intensity: 1.5
 --- !u!114 &-2393621732099550697
@@ -27,14 +27,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb81397b7ce75d943bd70c8072182333, type: 3}
   m_Name: KaiserReflection
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     reflectionType: 3
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
     resolution: 0
     blueNoise: {fileID: 2800000, guid: bc05168357e480443aa527380a6402a7, type: 3}
     smoothMultiplier: 0
-    intensity: 3.04
+    intensity: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

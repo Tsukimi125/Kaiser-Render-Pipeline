@@ -23,7 +23,8 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
         {
             // Calling ConfigureInput with the ScriptableRenderPassInput.Color argument
             // ensures that the opaque texture is available to the Render Pass.
-            m_RenderPass.ConfigureInput(ScriptableRenderPassInput.Color);
+            m_RenderPass.ConfigureInput(ScriptableRenderPassInput.Color | ScriptableRenderPassInput.Motion);
+
             m_RenderPass.SetTarget(renderer.cameraColorTargetHandle, m_Intensity);
         }
     }
