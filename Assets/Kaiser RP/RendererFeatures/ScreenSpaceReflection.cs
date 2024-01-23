@@ -82,7 +82,7 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
             var cameraData = renderingData.cameraData;
             var source = renderingData.cameraData.renderer.cameraColorTargetHandle;
             Vector2 viewportScale = source.useScaling ? new Vector2(source.rtHandleProperties.rtHandleScale.x, source.rtHandleProperties.rtHandleScale.y) : Vector2.one;
-            Debug.Log(viewportScale);
+            // Debug.Log(viewportScale);
             if (cameraData.camera.cameraType != CameraType.Game)
                 return;
 
