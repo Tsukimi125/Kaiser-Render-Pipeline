@@ -16,6 +16,36 @@ MonoBehaviour:
   m_Shader: {fileID: 4800000, guid: b839decee17742a418cb184f6ba33c78, type: 3}
   m_Intensity: 1
   m_Material: {fileID: 0}
+--- !u!114 &-6098593168255283579
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0692fd6169fabe408b49fd2238b9bd4, type: 3}
+  m_Name: ScreenSpaceReflection
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  m_Intensity: 0
+--- !u!114 &-3533370709736002669
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b46513145fcdeb469276e68a5fb807e, type: 3}
+  m_Name: ScreenSpaceReflection
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  m_Shader: {fileID: 4800000, guid: b839decee17742a418cb184f6ba33c78, type: 3}
+  m_Intensity: 1.5
+  m_Material: {fileID: 0}
 --- !u!114 &-2393621732099550697
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -28,14 +58,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb81397b7ce75d943bd70c8072182333, type: 3}
   m_Name: KaiserReflection
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   settings:
     reflectionType: 3
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
     resolution: 0
     blueNoise: {fileID: 2800000, guid: bc05168357e480443aa527380a6402a7, type: 3}
     smoothMultiplier: 0
-    intensity: 1
+    intensity: 3.04
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -56,8 +86,8 @@ MonoBehaviour:
   - {fileID: 6731091686167471330}
   - {fileID: 7714929738604356867}
   - {fileID: 455308206691208832}
-  - {fileID: 6951234992695535832}
-  m_RendererFeatureMap: 17128d73b725c8dee2e498c839a4695d03259cc8b8ef106b804e26d366945106d8e8e18965bf7760
+  - {fileID: -6098593168255283579}
+  m_RendererFeatureMap: 17128d73b725c8dee2e498c839a4695d03259cc8b8ef106b804e26d366945106850e8540d3715dab
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
