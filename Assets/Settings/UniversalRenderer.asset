@@ -29,7 +29,9 @@ MonoBehaviour:
   m_Name: ScreenSpaceReflection
   m_EditorClassIdentifier: 
   m_Active: 1
-  m_Intensity: 0
+  m_Settings:
+    intensity: 1
+    temporalWeight: 0.95
 --- !u!114 &-3533370709736002669
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -58,7 +60,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cb81397b7ce75d943bd70c8072182333, type: 3}
   m_Name: KaiserReflection
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     reflectionType: 3
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
@@ -220,7 +222,9 @@ MonoBehaviour:
   m_Name: ScreenSpaceReflection
   m_EditorClassIdentifier: 
   m_Active: 1
-  m_Intensity: 1
+  m_Settings:
+    intensity: 1
+    temporalWeight: 0.95
 --- !u!114 &7714929738604356867
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -5,10 +5,12 @@ using UnityEngine.Rendering.Universal;
 internal class ScreenSpaceReflection : ScriptableRendererFeature
 {
     private Shader m_Shader;
-    public float m_Intensity;
+    private Material m_Material;
 
-    Material m_Material;
+    private Shader m_Shader_Denoise;
+    private Material m_Material_Denoise;
 
+    public Settings m_Settings = new Settings();
     ScreenSpaceReflectionPass m_RenderPass = null;
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -28,8 +30,7 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
             // Calling ConfigureInput with the ScriptableRenderPassInput.Color argument
             // ensures that the opaque texture is available to the Render Pass.
             m_RenderPass.ConfigureInput(ScriptableRenderPassInput.Color | ScriptableRenderPassInput.Motion);
-
-            m_RenderPass.SetTarget(renderer.cameraColorTargetHandle, m_Intensity);
+            m_RenderPass.SetTarget(renderer.cameraColorTargetHandle, m_Settings);
         }
     }
 
@@ -45,13 +46,28 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
         CoreUtils.Destroy(m_Material);
     }
 
+    [System.Serializable]
+    internal class Settings
+    {
+        public float intensity = 1.0f;
+        public float temporalWeight = 0.95f;
+    }
+
     internal class ScreenSpaceReflectionPass : ScriptableRenderPass
     {
-        ProfilingSampler m_ProfilingSampler = new ProfilingSampler("ScreenSpaceReflection");
+        ProfilingSampler m_ProfilingSampler = new ProfilingSampler("[Kaiser]ScreenSpaceReflection");
         Material m_Material;
         RTHandle m_CameraColorTarget;
-        float m_Intensity;
-        RTHandle m_CopiedColor;
+        Settings settings;
+
+        static class SSRRTHandles
+        {
+            static public RTHandle copiedColor;
+            static public RTHandle ssrTexture1;
+            static public RTHandle ssrTexture2;
+            static public RTHandle ssrTexture3;
+        }
+        private uint m_FrameIndex = 0;
 
         public ScreenSpaceReflectionPass(Material material)
         {
@@ -63,13 +79,18 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
         {
             var colorCopyDescriptor = renderingData.cameraData.cameraTargetDescriptor;
             colorCopyDescriptor.depthBufferBits = (int)DepthBits.None;
-            RenderingUtils.ReAllocateIfNeeded(ref m_CopiedColor, colorCopyDescriptor, name: "_FullscreenPassColorCopy");
+
+            // Reallocate the RTHandles
+            RenderingUtils.ReAllocateIfNeeded(ref SSRRTHandles.copiedColor, colorCopyDescriptor, name: "_FullscreenPassColorCopy");
+            RenderingUtils.ReAllocateIfNeeded(ref SSRRTHandles.ssrTexture1, colorCopyDescriptor, name: "_SSR_Texture1");
+            RenderingUtils.ReAllocateIfNeeded(ref SSRRTHandles.ssrTexture2, colorCopyDescriptor, name: "_SSR_Texture2");
+            RenderingUtils.ReAllocateIfNeeded(ref SSRRTHandles.ssrTexture3, colorCopyDescriptor, name: "_SSR_Texture3");
         }
 
-        public void SetTarget(RTHandle colorHandle, float intensity)
+        public void SetTarget(RTHandle colorHandle, Settings settings)
         {
             m_CameraColorTarget = colorHandle;
-            m_Intensity = intensity;
+            this.settings = settings;
         }
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
@@ -91,25 +112,40 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
 
             CommandBuffer cmd = CommandBufferPool.Get();
 
-
-
+            int width = renderingData.cameraData.cameraTargetDescriptor.width;
+            int height = renderingData.cameraData.cameraTargetDescriptor.height;
+            
             using (new ProfilingScope(cmd, m_ProfilingSampler))
             {
+                Blitter.BlitCameraTexture(cmd, source, SSRRTHandles.copiedColor);
+                m_Material.SetFloat("_Intensity", settings.intensity);
+                m_Material.SetFloat("_SSR_TemporalWeight", settings.temporalWeight);
+                m_Material.SetFloat("_SSR_FrameIndex", m_FrameIndex);
+                m_Material.SetVector("_SSR_Resolution", new Vector4(width, height, 1.0f / width, 1.0f / height));
 
-                Blitter.BlitCameraTexture(cmd, source, m_CopiedColor);
-                m_Material.SetFloat("_Intensity", m_Intensity);
-                m_Material.SetTexture("_SSR_ColorTexture", m_CopiedColor);
+                m_Material.SetTexture("_SSR_ColorTexture", SSRRTHandles.copiedColor);
+                m_Material.SetTexture("_SSR_PrevTexture", SSRRTHandles.ssrTexture1);
                 // Blitter.BlitCameraTexture(cmd, source, m_CameraColorTarget, m_Material, 0);
 
-                CoreUtils.SetRenderTarget(cmd, cameraData.renderer.cameraColorTargetHandle);
+                CoreUtils.SetRenderTarget(cmd, SSRRTHandles.ssrTexture2);
                 CoreUtils.DrawFullScreen(cmd, m_Material);
+
+                Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, cameraData.renderer.cameraColorTargetHandle);
+                Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, SSRRTHandles.ssrTexture1);
+                
+                Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, SSRRTHandles.ssrTexture3, m_Material, 1);
+
                 // context.ExecuteCommandBuffer(cmd);
                 // cmd.Clear();
             }
+
+
             context.ExecuteCommandBuffer(cmd);
             cmd.Clear();
 
             CommandBufferPool.Release(cmd);
+
+            m_FrameIndex++;
         }
     }
 }
