@@ -175,11 +175,14 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
             float _Intensity;
             float _SSR_FrameIndex;
             float _SSR_TemporalWeight;
+            float _SSR_DenoiseKernelSize;
+
+            float4 _SSR_Resolution;
 
             float4 frag(Varyings input):SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                float2 uv = input.positionCS.xy / float2(1920, 1080);
+                float2 uv = input.positionCS.xy * _SSR_Resolution.zw;
                 uint2 pixelPosition = input.positionCS.xy;
                 
                 float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, uv, 0).r;
@@ -211,10 +214,124 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 float3 worldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
                 float3 viewPos = ComputeViewSpacePosition(uv, depth, UNITY_MATRIX_I_P);
                 viewPos.z = -viewPos.z;
-
-                float3 color = _MainTex.Sample(sampler_MainTex, uv).rgb;
                 
-                return float4(color, 1.0f);
+                const float2 offset[25] = {
+                    {
+                        - 2, -2
+                    },
+                    {
+                        - 1, -2
+                    },
+                    {
+                        0, -2
+                    },
+                    {
+                        1, -2
+                    },
+                    {
+                        2, -2
+                    },
+                    {
+                        - 2, -1
+                    },
+                    {
+                        - 1, -1
+                    },
+                    {
+                        0, -1
+                    },
+                    {
+                        1, -1
+                    },
+                    {
+                        2, -1
+                    },
+                    {
+                        - 2, 0
+                    },
+                    {
+                        - 1, 0
+                    },
+                    {
+                        0, 0
+                    },
+                    {
+                        1, 0
+                    },
+                    {
+                        2, 0
+                    },
+                    {
+                        - 2, 1
+                    },
+                    {
+                        - 1, 1
+                    },
+                    {
+                        0, 1
+                    },
+                    {
+                        1, 1
+                    },
+                    {
+                        2, 1
+                    },
+                    {
+                        - 2, 2
+                    },
+                    {
+                        - 1, 2
+                    },
+                    {
+                        0, 2
+                    },
+                    {
+                        1, 2
+                    },
+                    {
+                        2, 2
+                    }
+                };
+                
+                float3 sceneColor = _SSR_ColorTexture.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
+
+                float3 centerColor = _BlitTexture.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
+                float3 centerNormal = UnpackNormal(_GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0).rgb);
+                float3 centerWorldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP).xyz;
+                
+                // float colorPhi = 1.0f / 3.3f;
+                // float normalPhi = 0.01f / 2.0f ;
+                // float worldPosPhi = 0.5f / 5.5f;
+                float factor = 2.0f;
+                float colorPhi = 0.303f * factor;
+                float normalPhi = 0.005f * factor;
+                float worldPosPhi = 0.091f * factor;
+
+                float3 finalColor = float3(0.0, 0.0, 0.0);
+                float weight = 0.0;
+                float weightSum = 0.0;
+
+                for (int i = 0; i < 25; i++)
+                {
+                    float2 offsetUV = uv + offset[i] * _SSR_Resolution.zw * _SSR_DenoiseKernelSize * (roughness + 0.08);
+                    float3 offsetColor = _BlitTexture.SampleLevel(sampler_linear_clamp, offsetUV, 0).rgb;
+                    float3 t = centerColor - offsetColor;
+                    float colorWeight = min(exp(-dot(t, t) * colorPhi), 1.0);
+
+                    float3 offsetNormal = UnpackNormal(_GBuffer2.SampleLevel(sampler_linear_clamp, offsetUV, 0).rgb);
+                    t = centerNormal - offsetNormal;
+                    float normalWeight = min(exp(-dot(t, t) * normalPhi), 1.0);
+
+                    float3 offsetWorldPos = ComputeWorldSpacePosition(offsetUV, depth, UNITY_MATRIX_I_VP).xyz;
+                    t = centerWorldPos - offsetWorldPos;
+                    float worldPosWeight = min(exp(-dot(t, t) * worldPosPhi), 1.0);
+
+                    weight = colorWeight * normalWeight * worldPosWeight;
+                    finalColor += offsetColor * weight;
+                    weightSum += weight;
+                }
+                
+                return float4(finalColor / weightSum, 1.0f);
             }
             ENDHLSL
         }

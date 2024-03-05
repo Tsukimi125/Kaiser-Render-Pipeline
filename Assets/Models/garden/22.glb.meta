@@ -1,0 +1,57 @@
+fileFormatVersion: 2
+guid: 7842a15fe62e13646a2556d962fe9f94
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Concrete.001
+    second: {fileID: 2100000, guid: 11217251327910f47b2ec1023190c6f0, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: RoofTile
+    second: {fileID: 2100000, guid: 6fe6f39ce5383ee4c93ec42a90c09270, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WallWhite.001
+    second: {fileID: 2100000, guid: 8821ded8d7c4e924793b32e73130eb37, type: 2}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2Crete
+    second: {fileID: 2800000, guid: bdca5acb1f69b564ea7319af7bfc84d3, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2CreteB.normal
+    second: {fileID: 2800000, guid: b0f9f66166960ab4685b6afaaeb9f31a, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2RoofTile
+    second: {fileID: 2800000, guid: 53ce757e358021a419bacc3bd6888c94, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2RoofTileB.normal
+    second: {fileID: 2800000, guid: 064d9fe212827d3418f92a5ef1f8faf8, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WallWhite
+    second: {fileID: 2800000, guid: dcbfc5764584ae944b8e3299250f05cf, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WallWhiteB.normal
+    second: {fileID: 2800000, guid: 73f7e8792cf8da6448194e724a345ade, type: 3}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: cc45016b844e7624dae3aec10fb443ea, type: 3}
+  reverseAxis: 0
+  renderPipeline: 1

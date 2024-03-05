@@ -28,10 +28,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a0692fd6169fabe408b49fd2238b9bd4, type: 3}
   m_Name: ScreenSpaceReflection
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   m_Settings:
-    intensity: 1
+    intensity: 2
     temporalWeight: 0.95
+    denoiseKernelSizeStart: 1.2
+    denoiseKernelSizeMultiplier: 1.8
 --- !u!114 &-3533370709736002669
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -147,9 +149,9 @@ MonoBehaviour:
     AfterOpaque: 0
     Source: 1
     NormalSamples: 1
-    Intensity: 3
-    DirectLightingStrength: 0.25
-    Radius: 0.35
+    Intensity: 1
+    DirectLightingStrength: 1
+    Radius: 0.5
     Samples: 0
     BlurQuality: 0
     Falloff: 100
@@ -225,6 +227,8 @@ MonoBehaviour:
   m_Settings:
     intensity: 1
     temporalWeight: 0.95
+    denoiseKernelSizeStart: 1
+    denoiseKernelSizeMultiplier: 1
 --- !u!114 &7714929738604356867
 MonoBehaviour:
   m_ObjectHideFlags: 0

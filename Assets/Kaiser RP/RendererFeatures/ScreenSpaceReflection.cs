@@ -51,6 +51,8 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
     {
         public float intensity = 1.0f;
         public float temporalWeight = 0.95f;
+        public float denoiseKernelSizeStart = 1.0f;
+        public float denoiseKernelSizeMultiplier = 2.0f;
     }
 
     internal class ScreenSpaceReflectionPass : ScriptableRenderPass
@@ -121,19 +123,33 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
                 m_Material.SetFloat("_Intensity", settings.intensity);
                 m_Material.SetFloat("_SSR_TemporalWeight", settings.temporalWeight);
                 m_Material.SetFloat("_SSR_FrameIndex", m_FrameIndex);
+                float denoiseKernelSize = settings.denoiseKernelSizeStart;
+                m_Material.SetFloat("_SSR_DenoiseKernelSize", denoiseKernelSize);
                 m_Material.SetVector("_SSR_Resolution", new Vector4(width, height, 1.0f / width, 1.0f / height));
 
                 m_Material.SetTexture("_SSR_ColorTexture", SSRRTHandles.copiedColor);
+                
                 m_Material.SetTexture("_SSR_PrevTexture", SSRRTHandles.ssrTexture1);
                 // Blitter.BlitCameraTexture(cmd, source, m_CameraColorTarget, m_Material, 0);
 
                 CoreUtils.SetRenderTarget(cmd, SSRRTHandles.ssrTexture2);
                 CoreUtils.DrawFullScreen(cmd, m_Material);
-
-                Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, cameraData.renderer.cameraColorTargetHandle);
                 Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, SSRRTHandles.ssrTexture1);
+                denoiseKernelSize *= settings.denoiseKernelSizeMultiplier;
                 
+                m_Material.SetFloat("_SSR_DenoiseKernelSize", denoiseKernelSize);
                 Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, SSRRTHandles.ssrTexture3, m_Material, 1);
+                denoiseKernelSize *= settings.denoiseKernelSizeMultiplier;
+                m_Material.SetFloat("_SSR_DenoiseKernelSize", denoiseKernelSize);
+                Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture3, SSRRTHandles.ssrTexture2, m_Material, 1);
+                denoiseKernelSize *= settings.denoiseKernelSizeMultiplier;
+                m_Material.SetFloat("_SSR_DenoiseKernelSize", denoiseKernelSize);
+                Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, SSRRTHandles.ssrTexture3, m_Material, 1);
+                //denoiseKernelSize *= settings.denoiseKernelSizeMultiplier;
+                //m_Material.SetFloat("_SSR_DenoiseKernelSize", denoiseKernelSize);
+                //Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture3, SSRRTHandles.ssrTexture2, m_Material, 1);
+
+                Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture3, cameraData.renderer.cameraColorTargetHandle, m_Material, 1);
 
                 // context.ExecuteCommandBuffer(cmd);
                 // cmd.Clear();

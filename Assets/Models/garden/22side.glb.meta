@@ -1,0 +1,207 @@
+fileFormatVersion: 2
+guid: 44f5afd6b6419684fb81ea6bbbb8c4ae
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Concrete.013
+    second: {fileID: 2100000, guid: c29d18e1714e7204cb4311172ae0b0db, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: DoorsFrame.005
+    second: {fileID: 2100000, guid: e2f68dea17ba64648be6a41fe6879b2b, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: LowerWalls.006
+    second: {fileID: 2100000, guid: 6c0c4cd571892bf46806a19dc25d33b8, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Ornaments.002
+    second: {fileID: 2100000, guid: 32d3a7922f9018b448fa16c7f40412c0, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: PaintedPlasterRed.004
+    second: {fileID: 2100000, guid: a09fd974192cf2747a44ef8c6c9cbea8, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: RoofTile.011
+    second: {fileID: 2100000, guid: 832141cbd4a057a4f938591d09e75592, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Screen.006
+    second: {fileID: 2100000, guid: 02977a9455618df48b519f319b8fbe9e, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WhiteWallPLaster.004
+    second: {fileID: 2100000, guid: 63e922d228d9bcf4dafd58aca6d80535, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Window2Screen.002
+    second: {fileID: 2100000, guid: 9f70fc07cbe4a8f4ea6ca6f917685ec1, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WindowBoxPaint.006
+    second: {fileID: 2100000, guid: 2c4b63ad175253a46895d5f64f22fee0, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WindowFrames.002
+    second: {fileID: 2100000, guid: 9eb4c1db2c3747448923a19bac25964e, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: WindowWall.002
+    second: {fileID: 2100000, guid: 03f993239114ca54cbcd8a15280d6d20, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Windows1Screen.002
+    second: {fileID: 2100000, guid: b700a46fbecec7e48a2feb38b8ae8da3, type: 2}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2Crete
+    second: {fileID: 2800000, guid: 460fa4b12a6f8a24c9636bfe052fd7e7, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2CreteB.normal
+    second: {fileID: 2800000, guid: e684e75d1fd11034aaee9bdf67d65ca3, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2LowerWall
+    second: {fileID: 2800000, guid: f7b60bf8b83309e45b967076495506d7, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2LowerWallB.normal
+    second: {fileID: 2800000, guid: c15c26444943a8c44874b2da6f84e697, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2RoofTile
+    second: {fileID: 2800000, guid: 1fd24c7197544bf47a0a28007b548986, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2RoofTileB.normal
+    second: {fileID: 2800000, guid: 93f904f8d8446164cb6771c3088e4fc1, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WallWhite
+    second: {fileID: 2800000, guid: 6b802b9778f4f5f40942f0c336a32455, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WallWhiteB.normal
+    second: {fileID: 2800000, guid: ca9dbf13bdf22ba41b1d6c4fdd738160, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WallWhiteB__UNIGLTF__DUPLICATED__2.normal
+    second: {fileID: 2800000, guid: a2ecf7ea903097342a55e32919b2c94d, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WallWhiteB__UNIGLTF__DUPLICATED__3.normal
+    second: {fileID: 2800000, guid: b2519327c11f63442b323a8e3bba2e13, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WallWhiteB__UNIGLTF__DUPLICATED__4.normal
+    second: {fileID: 2800000, guid: 43232107db5d21649b120b9ac2007517, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WallWhite__UNIGLTF__DUPLICATED__2
+    second: {fileID: 2800000, guid: e465ebd686e1d004781f42cb374b4076, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WallWhite__UNIGLTF__DUPLICATED__3
+    second: {fileID: 2800000, guid: 18e99daae7fe79f4f9a41c31e35f35ad, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2Win
+    second: {fileID: 2800000, guid: ddf0a3a0b81726a41b3c17cee58a7eec, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WinB.normal
+    second: {fileID: 2800000, guid: 90c96a330daa18a4883a320cb94b5d9e, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2WinB__UNIGLTF__DUPLICATED__2.normal
+    second: {fileID: 2800000, guid: ad6f25d32d55b2c4d800ff34ede2b4f9, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2Win__UNIGLTF__DUPLICATED__2
+    second: {fileID: 2800000, guid: 593716c3f3b1c5f468ceddb072e9ab12, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2det
+    second: {fileID: 2800000, guid: 36b386c8277e4434f8025e4a9a402800, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2detB__UNIGLTF__DUPLICATED__2.normal
+    second: {fileID: 2800000, guid: d72b3c98d30a14543bf7e0d355e3edc7, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2plaster3
+    second: {fileID: 2800000, guid: 242e8fa200c781f4e87a86ba64e78d68, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2screen
+    second: {fileID: 2800000, guid: 0361935b681eefc47ac8a14d28e29a4c, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2screenB__UNIGLTF__DUPLICATED__2.normal
+    second: {fileID: 2800000, guid: e8365736f8ca43d44b6882d6ccd71049, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2screenB__UNIGLTF__DUPLICATED__4.normal
+    second: {fileID: 2800000, guid: 4c07b09f15169474b9083f7a82f66ef8, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2screenB__UNIGLTF__DUPLICATED__6.normal
+    second: {fileID: 2800000, guid: aabe21e9598692d46bfc5c35c6efd33b, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2screen__UNIGLTF__DUPLICATED__2
+    second: {fileID: 2800000, guid: 655a41a8213c304458843a4c45aeb910, type: 3}
+  - first:
+      type: UnityEngine:Texture
+      assembly: UnityEngine.CoreModule
+      name: sa2screen__UNIGLTF__DUPLICATED__3
+    second: {fileID: 2800000, guid: 7648f257f6020d148b8b8de3305909a7, type: 3}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: cc45016b844e7624dae3aec10fb443ea, type: 3}
+  reverseAxis: 0
+  renderPipeline: 1

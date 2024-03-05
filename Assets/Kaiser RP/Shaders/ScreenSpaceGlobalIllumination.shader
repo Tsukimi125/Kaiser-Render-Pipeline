@@ -105,7 +105,6 @@ Shader "Hidden/KaiserRP/ScreenSpaceGlobalIllumination"
                     half4 encodedIrradiance = half4(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, reflectionDirWS, 0));
                     sceneColor = DecodeHDREnvironment(encodedIrradiance, unity_SpecCube0_HDR);
                     return float4(encodedIrradiance);// F0 * sceneColor * hitSuccessful.xxx
-
                 }
                 // brdf and pdf ?
                 // return 0;
