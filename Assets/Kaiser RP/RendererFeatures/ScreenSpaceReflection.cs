@@ -135,6 +135,7 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
                 CoreUtils.SetRenderTarget(cmd, SSRRTHandles.ssrTexture2);
                 CoreUtils.DrawFullScreen(cmd, m_Material);
                 Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, SSRRTHandles.ssrTexture1);
+                // Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, cameraData.renderer.cameraColorTargetHandle);
                 denoiseKernelSize *= settings.denoiseKernelSizeMultiplier;
                 
                 m_Material.SetFloat("_SSR_DenoiseKernelSize", denoiseKernelSize);

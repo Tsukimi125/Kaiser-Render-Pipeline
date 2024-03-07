@@ -77,7 +77,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 // roughness = roughness * roughness;
 
                 // Compute F0
-                half3 F0 = 0.04f.xxx;
+                half3 F0 = 0.4f.xxx;
                 half3 albedo = _GBuffer0.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
                 F0 = lerp(F0, albedo, metallic);
                 // F0 = lerp(F0, 1.0f.xxx, 0);
@@ -107,7 +107,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
 
                 LinearTrace(ray, _CameraDepthTexture, sampler_linear_clamp, random, hitSuccessful, hitUV);
 
-                float3 sceneColor = _SSR_ColorTexture.SampleLevel(sampler_SSR_ColorTexture, hitUV, 0).rgb;
+                float3 sceneColor = _SSR_ColorTexture.SampleLevel(sampler_SSR_ColorTexture, hitUV, 0).rgb * 2.5f;
                 if (!hitSuccessful)
                 {
                     roughness = roughness * 7;
@@ -395,11 +395,12 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 uint2 pixelPosition = input.positionCS.xy;
                 
                 float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, uv, 0).r;
-
+                
+                float3 sceneColor = _SSR_ColorTexture.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
                 [branch]
                 if (depth <= 1e-4)
                 {
-                    return 0;
+                    return float4(sceneColor, 1.0f);
                 }
 
                 float3 prevColor = _SSR_PrevTexture.SampleLevel(sampler_SSR_PrevTexture, uv, 0).rgb;
@@ -502,7 +503,6 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                     }
                 };
                 
-                float3 sceneColor = _SSR_ColorTexture.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
 
                 float3 centerColor = _BlitTexture.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
                 float3 centerNormal = UnpackNormal(_GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0).rgb);
@@ -540,7 +540,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                     weightSum += weight;
                 }
                 
-                return float4(sceneColor + finalColor / weightSum, 1.0f);
+                return float4(lerp(sceneColor, finalColor / weightSum, F0), 1.0f);
             }
             ENDHLSL
         }
