@@ -28,7 +28,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a0692fd6169fabe408b49fd2238b9bd4, type: 3}
   m_Name: ScreenSpaceReflection
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   m_Settings:
     intensity: 2
     temporalWeight: 0.95

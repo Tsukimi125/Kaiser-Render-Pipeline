@@ -149,7 +149,7 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
                 //m_Material.SetFloat("_SSR_DenoiseKernelSize", denoiseKernelSize);
                 //Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture3, SSRRTHandles.ssrTexture2, m_Material, 1);
 
-                Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture3, cameraData.renderer.cameraColorTargetHandle, m_Material, 1);
+                Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture3, cameraData.renderer.cameraColorTargetHandle, m_Material, 2);
 
                 // context.ExecuteCommandBuffer(cmd);
                 // cmd.Clear();
