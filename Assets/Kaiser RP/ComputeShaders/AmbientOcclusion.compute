@@ -276,7 +276,7 @@ void AO_Combine(uint3 id:SV_DispatchThreadID)
     float3 ao = SAMPLE_TEXTURE2D_LOD(_AO_In_AmbientOcclusionRT, sampler_linear_clamp, uv, 0).rgb;
     
     // _AO_Out_FinalRT[id.xy] = float4(sceneColor * ao, 1.0);
-    _AO_Out_FinalRT[id.xy] = float4(1.0f * (1.0f - ao), 1.0);
+    _AO_Out_FinalRT[id.xy] = float4(sceneColor * (1.0f - ao), 1.0);
     // _AO_Out_FinalRT[id.xy] = float4(1.0, 0.0, 0.0, 1.0);
 
 }

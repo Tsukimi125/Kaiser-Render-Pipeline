@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.Serialization;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -46,9 +48,16 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
         CoreUtils.Destroy(m_Material);
     }
 
+    public enum TraceType
+    {
+        SSR,
+        SSGI
+    }
+
     [System.Serializable]
     internal class Settings
     {
+        public TraceType traceType = TraceType.SSR;
         public float intensity = 1.0f;
         public float temporalWeight = 0.95f;
         public float denoiseKernelSizeStart = 1.0f;
@@ -112,11 +121,16 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
             if (m_Material == null)
                 return;
 
+            if (settings.traceType == TraceType.SSGI)
+                m_Material.EnableKeyword("KAISER_SSGI");
+            else
+                m_Material.DisableKeyword("KAISER_SSGI");
+
             CommandBuffer cmd = CommandBufferPool.Get();
 
             int width = renderingData.cameraData.cameraTargetDescriptor.width;
             int height = renderingData.cameraData.cameraTargetDescriptor.height;
-            
+
             using (new ProfilingScope(cmd, m_ProfilingSampler))
             {
                 Blitter.BlitCameraTexture(cmd, source, SSRRTHandles.copiedColor);
@@ -128,7 +142,7 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
                 m_Material.SetVector("_SSR_Resolution", new Vector4(width, height, 1.0f / width, 1.0f / height));
 
                 m_Material.SetTexture("_SSR_ColorTexture", SSRRTHandles.copiedColor);
-                
+
                 m_Material.SetTexture("_SSR_PrevTexture", SSRRTHandles.ssrTexture1);
                 // Blitter.BlitCameraTexture(cmd, source, m_CameraColorTarget, m_Material, 0);
 
@@ -137,7 +151,7 @@ internal class ScreenSpaceReflection : ScriptableRendererFeature
                 Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, SSRRTHandles.ssrTexture1);
                 // Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, cameraData.renderer.cameraColorTargetHandle);
                 denoiseKernelSize *= settings.denoiseKernelSizeMultiplier;
-                
+
                 m_Material.SetFloat("_SSR_DenoiseKernelSize", denoiseKernelSize);
                 Blitter.BlitCameraTexture(cmd, SSRRTHandles.ssrTexture2, SSRRTHandles.ssrTexture3, m_Material, 1);
                 denoiseKernelSize *= settings.denoiseKernelSizeMultiplier;

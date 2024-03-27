@@ -5,6 +5,9 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
         Tags { "RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" }
         LOD 100
         ZWrite Off Cull Off
+        HLSLINCLUDE
+        #pragma shader_feature KAISER_SSGI
+        ENDHLSL
         Pass
         {
             Name "ScreenSpaceReflectionPass"
@@ -62,22 +65,29 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 
                 float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, uv, 0).r;
 
-                [branch]
-                if (depth <= 1e-4)
-                {
-                    return 0;
-                }
 
                 float3 prevColor = _SSR_PrevTexture.SampleLevel(sampler_SSR_PrevTexture, uv, 0).rgb;
 
                 float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
-                half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
-                half metallic = _GBuffer1.SampleLevel(sampler_linear_clamp, uv, 0).r;
+                half roughness = clamp(1.0 - gbuffer2.w, 0.001f, 1.0);
+                
+                
+                [branch]
+                if (depth <= 1e-4) //  || roughness > 0.5
 
+                {
+                    return 0;
+                }
+                
+                half metallic = _GBuffer1.SampleLevel(sampler_linear_clamp, uv, 0).r;
+                #ifdef KAISER_SSGI
+                    roughness = 0.99f;
+                    metallic = 0.0f;
+                #endif
                 // roughness = roughness * roughness;
 
                 // Compute F0
-                half3 F0 = 0.4f.xxx;
+                half3 F0 = 0.04f.xxx;
                 half3 albedo = _GBuffer0.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
                 F0 = lerp(F0, albedo, metallic);
                 // F0 = lerp(F0, 1.0f.xxx, 0);
@@ -91,13 +101,19 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 viewPos.z = -viewPos.z;
 
                 // rand gen
-                uint frameIDMod8 = uint(fmod(_SSR_FrameIndex, 1024));
+                uint frameIDMod8 = uint(fmod(_SSR_FrameIndex, 8192));
                 uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
-                float2 hash = frac(Hammersley16(frameIDMod8, (uint)1024, random));
-
-                float4 H = float4(worldNormal, 1.0);
-                H = TangentToWorld(ImportanceSampleGGX(hash, roughness).xyz, float4(worldNormal, 1.0));
-                float3 reflectionDirWS = reflect(normalize(worldPos - _WorldSpaceCameraPos), H.xyz);
+                float2 hash = frac(Hammersley16(frameIDMod8, (uint)8192, random));
+                
+                float3 reflectionDirWS;
+                
+                #ifdef KAISER_SSGI
+                    reflectionDirWS = TangentToWorld(ImportanceSampleGGX(hash, roughness).xyz, float4(worldNormal, 1.0));
+                #else
+                    float4 H = float4(worldNormal, 1.0);
+                    H = TangentToWorld(ImportanceSampleGGX(hash, roughness).xyz, float4(worldNormal, 1.0));
+                    reflectionDirWS = reflect(normalize(worldPos - _WorldSpaceCameraPos), H.xyz);
+                #endif
                 
                 Ray ray;
                 ray.pos = worldPos;
@@ -107,13 +123,12 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
 
                 LinearTrace(ray, _CameraDepthTexture, sampler_linear_clamp, random, hitSuccessful, hitUV);
 
-                float3 sceneColor = _SSR_ColorTexture.SampleLevel(sampler_SSR_ColorTexture, hitUV, 0).rgb * 2.5f;
+                float3 sceneColor = _SSR_ColorTexture.SampleLevel(sampler_SSR_ColorTexture, hitUV, 0).rgb * 1.25f;
                 if (!hitSuccessful)
                 {
-                    roughness = roughness * 7;
-                    
                     half4 encodedIrradiance = half4(SAMPLE_TEXTURECUBE_LOD(_GlossyEnvironmentCubeMap, sampler_GlossyEnvironmentCubeMap, reflectionDirWS, 0));
-                    sceneColor = DecodeHDREnvironment(encodedIrradiance, _GlossyEnvironmentColor);
+                    sceneColor = DecodeHDREnvironment(encodedIrradiance, _GlossyEnvironmentColor) * 1.0;
+                    // sceneColor = 0;
                     // half4 encodedIrradiance = half4(SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, reflectionDirWS, 1));
                     // sceneColor = DecodeHDREnvironment(encodedIrradiance, unity_SpecCube0_HDR);
                     // return float4(sceneColor, 1.0f);// F0 * sceneColor * hitSuccessful.xxx
@@ -121,6 +136,11 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 }
                 // brdf and pdf ?
                 // return 0;
+                // return float4(lerp(saturate(sceneColor), prevColor, _SSR_TemporalWeight), 1.0);// F0 * sceneColor * hitSuccessful.xxx
+                #ifdef KAISER_SSGI
+                    return float4(lerp(saturate(sceneColor), prevColor, _SSR_TemporalWeight), 1.0);
+                #endif
+                
                 return float4(lerp(saturate(F0 * sceneColor), prevColor, _SSR_TemporalWeight), 1.0);// F0 * sceneColor * hitSuccessful.xxx
 
             }
@@ -197,6 +217,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
 
                 float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
                 half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
+                roughness = 0.99f;
                 half metallic = _GBuffer1.SampleLevel(sampler_linear_clamp, uv, 0).r;
 
                 // roughness = roughness * roughness;
@@ -216,6 +237,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 viewPos.z = -viewPos.z;
                 
                 const float2 offset[25] = {
+
                     {
                         - 2, -2
                     },
@@ -397,18 +419,22 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, sampler_linear_clamp, uv, 0).r;
                 
                 float3 sceneColor = _SSR_ColorTexture.SampleLevel(sampler_linear_clamp, uv, 0).rgb;
-                [branch]
-                if (depth <= 1e-4)
-                {
-                    return float4(sceneColor, 1.0f);
-                }
+
+                
 
                 float3 prevColor = _SSR_PrevTexture.SampleLevel(sampler_SSR_PrevTexture, uv, 0).rgb;
 
                 float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
-                half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
-                half metallic = _GBuffer1.SampleLevel(sampler_linear_clamp, uv, 0).r;
+                half roughness = clamp(1.0 - gbuffer2.w, 0.001f, 1.0);
+                roughness = 0.99f;
 
+                half metallic = _GBuffer1.SampleLevel(sampler_linear_clamp, uv, 0).r;
+                [branch]
+                if (depth <= 1e-4) // || roughness > 0.49)
+
+                {
+                    return float4(sceneColor, 1.0f);
+                }
                 // roughness = roughness * roughness;
 
                 // Compute F0
@@ -426,6 +452,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 viewPos.z = -viewPos.z;
                 
                 const float2 offset[25] = {
+
                     {
                         - 2, -2
                     },
@@ -539,8 +566,8 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                     finalColor += offsetColor * weight;
                     weightSum += weight;
                 }
-                
-                return float4(lerp(sceneColor, finalColor / weightSum, F0), 1.0f);
+                return float4(finalColor * _Intensity / weightSum, 1.0f); // sceneColor +
+
             }
             ENDHLSL
         }
