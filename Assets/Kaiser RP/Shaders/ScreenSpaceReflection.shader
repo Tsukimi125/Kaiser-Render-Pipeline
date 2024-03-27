@@ -140,7 +140,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 #ifdef KAISER_SSGI
                     return float4(lerp(saturate(sceneColor), prevColor, _SSR_TemporalWeight), 1.0);
                 #endif
-                
+
                 return float4(lerp(saturate(F0 * sceneColor), prevColor, _SSR_TemporalWeight), 1.0);// F0 * sceneColor * hitSuccessful.xxx
 
             }
@@ -217,9 +217,12 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
 
                 float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
                 half roughness = clamp(1.0 - gbuffer2.w, 0.02, 1.0);
-                roughness = 0.99f;
+                
                 half metallic = _GBuffer1.SampleLevel(sampler_linear_clamp, uv, 0).r;
-
+                #ifdef KAISER_SSGI
+                    roughness = 1.0f;
+                    metallic = 0.0f;
+                #endif
                 // roughness = roughness * roughness;
 
                 // Compute F0
@@ -335,7 +338,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
 
                 for (int i = 0; i < 25; i++)
                 {
-                    float2 offsetUV = uv + offset[i] * _SSR_Resolution.zw * _SSR_DenoiseKernelSize * (roughness + 0.08);
+                    float2 offsetUV = uv + offset[i] * _SSR_Resolution.zw * _SSR_DenoiseKernelSize * (roughness + 0.1);
                     float3 offsetColor = _BlitTexture.SampleLevel(sampler_linear_clamp, offsetUV, 0).rgb;
                     float3 t = centerColor - offsetColor;
                     float colorWeight = min(exp(-dot(t, t) * colorPhi), 1.0);
@@ -426,9 +429,13 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
 
                 float4 gbuffer2 = _GBuffer2.SampleLevel(sampler_linear_clamp, uv, 0);
                 half roughness = clamp(1.0 - gbuffer2.w, 0.001f, 1.0);
-                roughness = 0.99f;
-
                 half metallic = _GBuffer1.SampleLevel(sampler_linear_clamp, uv, 0).r;
+
+                #ifdef KAISER_SSGI
+                    roughness = 1.0f;
+                    metallic = 0.0f;
+                #endif
+
                 [branch]
                 if (depth <= 1e-4) // || roughness > 0.49)
 
@@ -566,7 +573,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                     finalColor += offsetColor * weight;
                     weightSum += weight;
                 }
-                return float4(finalColor * _Intensity / weightSum, 1.0f); // sceneColor +
+                return float4(sceneColor + finalColor * _Intensity / weightSum, 1.0f); // sceneColor +
 
             }
             ENDHLSL
