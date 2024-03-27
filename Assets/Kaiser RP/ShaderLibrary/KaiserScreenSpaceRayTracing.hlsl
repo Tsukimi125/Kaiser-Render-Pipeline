@@ -64,7 +64,7 @@ RayHit LinearTrace(
     out bool hitSuccessful, out float2 hitUV)
 {
     RayHit rayHit = InitializeRayHit();
-    float raymarchingThickness = 0.25;
+    float raymarchingThickness = 1.0;
     float stepSize = 0.5;
     float stepMultiplier = 1.2;
     float3 rayWorldPos = ray.pos;

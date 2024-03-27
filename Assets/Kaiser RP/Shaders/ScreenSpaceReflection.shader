@@ -82,7 +82,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 half metallic = _GBuffer1.SampleLevel(sampler_linear_clamp, uv, 0).r;
                 #ifdef KAISER_SSGI
                     roughness = 0.99f;
-                    metallic = 0.0f;
+                    metallic = 0.01f;
                 #endif
                 // roughness = roughness * roughness;
 
@@ -138,7 +138,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 // return 0;
                 // return float4(lerp(saturate(sceneColor), prevColor, _SSR_TemporalWeight), 1.0);// F0 * sceneColor * hitSuccessful.xxx
                 #ifdef KAISER_SSGI
-                    return float4(lerp(saturate(sceneColor), prevColor, _SSR_TemporalWeight), 1.0);
+                    return float4(lerp(clamp(sceneColor, 0, 10.0f), prevColor, _SSR_TemporalWeight), 1.0);
                 #endif
 
                 return float4(lerp(saturate(F0 * sceneColor), prevColor, _SSR_TemporalWeight), 1.0);// F0 * sceneColor * hitSuccessful.xxx

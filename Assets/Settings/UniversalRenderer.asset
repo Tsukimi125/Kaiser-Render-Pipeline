@@ -28,12 +28,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a0692fd6169fabe408b49fd2238b9bd4, type: 3}
   m_Name: ScreenSpaceReflection
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   m_Settings:
-    intensity: 2.2
-    temporalWeight: 0.95
-    denoiseKernelSizeStart: 2
-    denoiseKernelSizeMultiplier: 1.8
+    traceType: 1
+    intensity: 1.5
+    temporalWeight: 0.975
+    denoiseKernelSizeStart: 1
+    denoiseKernelSizeMultiplier: 1.5
 --- !u!114 &-3533370709736002669
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -64,12 +65,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Active: 0
   settings:
-    reflectionType: 3
+    reflectionType: 0
     computeShader: {fileID: 7200000, guid: 063888a6323132147bea65cfaef4a812, type: 3}
-    resolution: 0
+    resolution: 1
     blueNoise: {fileID: 2800000, guid: bc05168357e480443aa527380a6402a7, type: 3}
     smoothMultiplier: 0
-    intensity: 3.04
+    intensity: 10
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -152,7 +153,7 @@ MonoBehaviour:
     NormalSamples: 1
     Intensity: 0.8
     DirectLightingStrength: 1
-    Radius: 3
+    Radius: 5
     Samples: 0
     BlurQuality: 0
     Falloff: 25
@@ -249,6 +250,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Active: 1
   m_Settings:
+    traceType: 0
     intensity: 1
     temporalWeight: 0.95
     denoiseKernelSizeStart: 1
@@ -271,8 +273,8 @@ MonoBehaviour:
     computeShader: {fileID: 7200000, guid: 62b7b830229fa9d4fbeec480ada00b39, type: 3}
     blueNoiseTexture: {fileID: 2800000, guid: 890284e1b7e4dc341992e5c8f92dfe1b, type: 3}
     aoType: 1
-    intensity: 0.99
-    aoRadius: 3.6
+    intensity: 2
+    aoRadius: 8
     maxDistance: 100
     directionCount: 2
     sampleCount: 4
