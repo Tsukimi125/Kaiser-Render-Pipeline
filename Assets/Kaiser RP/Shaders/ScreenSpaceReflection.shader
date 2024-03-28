@@ -123,7 +123,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
 
                 LinearTrace(ray, _CameraDepthTexture, sampler_linear_clamp, random, hitSuccessful, hitUV);
 
-                float3 sceneColor = _SSR_ColorTexture.SampleLevel(sampler_SSR_ColorTexture, hitUV, 0).rgb * 1.25f;
+                float3 sceneColor = _SSR_ColorTexture.SampleLevel(sampler_SSR_ColorTexture, hitUV, 0).rgb;
                 if (!hitSuccessful)
                 {
                     half4 encodedIrradiance = half4(SAMPLE_TEXTURECUBE_LOD(_GlossyEnvironmentCubeMap, sampler_GlossyEnvironmentCubeMap, reflectionDirWS, 0));
@@ -138,7 +138,7 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 // return 0;
                 // return float4(lerp(saturate(sceneColor), prevColor, _SSR_TemporalWeight), 1.0);// F0 * sceneColor * hitSuccessful.xxx
                 #ifdef KAISER_SSGI
-                    return float4(lerp(clamp(sceneColor, 0, 10.0f), prevColor, _SSR_TemporalWeight), 1.0);
+                    return float4(lerp(clamp(albedo * sceneColor, 0.01f, 64.0f), prevColor, _SSR_TemporalWeight), 1.0);
                 #endif
 
                 return float4(lerp(saturate(F0 * sceneColor), prevColor, _SSR_TemporalWeight), 1.0);// F0 * sceneColor * hitSuccessful.xxx
@@ -238,6 +238,10 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 float3 worldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
                 float3 viewPos = ComputeViewSpacePosition(uv, depth, UNITY_MATRIX_I_P);
                 viewPos.z = -viewPos.z;
+
+                uint frameIDMod8 = uint(fmod(_SSR_FrameIndex, 128));
+                uint2 random = Rand3DPCG16(uint3(pixelPosition, frameIDMod8)).xy;
+                
                 
                 const float2 offset[25] = {
 
@@ -328,9 +332,9 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 // float normalPhi = 0.01f / 2.0f ;
                 // float worldPosPhi = 0.5f / 5.5f;
                 float factor = 2.0f;
-                float colorPhi = 0.303f * factor;
-                float normalPhi = 0.005f * factor;
-                float worldPosPhi = 0.091f * factor;
+                float colorPhi = 0.103f * factor;
+                float normalPhi = 0.355f * factor;
+                float worldPosPhi = 0.251f * factor;
 
                 float3 finalColor = float3(0.0, 0.0, 0.0);
                 float weight = 0.0;
@@ -338,7 +342,10 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
 
                 for (int i = 0; i < 25; i++)
                 {
-                    float2 offsetUV = uv + offset[i] * _SSR_Resolution.zw * _SSR_DenoiseKernelSize * (roughness + 0.1);
+                    float2 hash = frac(Hammersley16((frameIDMod8 + i * 7), (uint)153, random));
+                    hash = hash * 2.0 - 1.0;
+                    // float2 offsetUV = uv + offset[i] * _SSR_Resolution.zw * _SSR_DenoiseKernelSize * (roughness + 0.5);
+                    float2 offsetUV = uv + hash * _SSR_Resolution.zw * _SSR_DenoiseKernelSize * (roughness + 1);
                     float3 offsetColor = _BlitTexture.SampleLevel(sampler_linear_clamp, offsetUV, 0).rgb;
                     float3 t = centerColor - offsetColor;
                     float colorWeight = min(exp(-dot(t, t) * colorPhi), 1.0);
@@ -546,9 +553,9 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
                 // float normalPhi = 0.01f / 2.0f ;
                 // float worldPosPhi = 0.5f / 5.5f;
                 float factor = 2.0f;
-                float colorPhi = 0.303f * factor;
-                float normalPhi = 0.005f * factor;
-                float worldPosPhi = 0.091f * factor;
+                float colorPhi = 0.103f * factor;
+                float normalPhi = 0.355f * factor;
+                float worldPosPhi = 0.251f * factor;
 
                 float3 finalColor = float3(0.0, 0.0, 0.0);
                 float weight = 0.0;
@@ -556,7 +563,8 @@ Shader "Hidden/KaiserRP/ScreenSpaceReflection"
 
                 for (int i = 0; i < 25; i++)
                 {
-                    float2 offsetUV = uv + offset[i] * _SSR_Resolution.zw * _SSR_DenoiseKernelSize * (roughness + 0.08);
+                    // float2 offsetUV = uv + offset[i] * _SSR_Resolution.zw * _SSR_DenoiseKernelSize * (roughness + 0.5);
+                    float2 offsetUV = uv + offset[i] * _SSR_Resolution.zw * (roughness + 1);
                     float3 offsetColor = _BlitTexture.SampleLevel(sampler_linear_clamp, offsetUV, 0).rgb;
                     float3 t = centerColor - offsetColor;
                     float colorWeight = min(exp(-dot(t, t) * colorPhi), 1.0);

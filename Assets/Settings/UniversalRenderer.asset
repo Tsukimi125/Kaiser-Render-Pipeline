@@ -31,10 +31,10 @@ MonoBehaviour:
   m_Active: 1
   m_Settings:
     traceType: 1
-    intensity: 1.5
-    temporalWeight: 0.975
-    denoiseKernelSizeStart: 1
-    denoiseKernelSizeMultiplier: 1.5
+    intensity: 1
+    temporalWeight: 0.95
+    denoiseKernelSizeStart: 1.5
+    denoiseKernelSizeMultiplier: 1.8
 --- !u!114 &-3533370709736002669
 MonoBehaviour:
   m_ObjectHideFlags: 0

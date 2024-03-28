@@ -65,8 +65,8 @@ RayHit LinearTrace(
 {
     RayHit rayHit = InitializeRayHit();
     float raymarchingThickness = 1.0;
-    float stepSize = 0.5;
-    float stepMultiplier = 1.2;
+    float stepSize = 0.15;
+    float stepMultiplier = 1.25;
     float3 rayWorldPos = ray.pos;
     float3 rayNDCPos = float3(0.0, 0.0, 0.0);
 
@@ -79,7 +79,7 @@ RayHit LinearTrace(
     for (uint i = 1; i <= 128; i++)
     {
         float2 hash = frac(Hammersley16(i, (uint)128, random));
-        rayWorldPos += ray.dir * stepSize * (1 + hash.x);
+        rayWorldPos += ray.dir * stepSize * (0.75 + 0.5 * hash.x);
         rayNDCPos = ComputeNormalizedDeviceCoordinatesWithZ(rayWorldPos, UNITY_MATRIX_VP);
         
         bool isScreenSpace = (rayNDCPos.x > 0.0 && rayNDCPos.y > 0.0 && rayNDCPos.x < 1.0 && rayNDCPos.y < 1.0) ? true:false;
@@ -104,7 +104,8 @@ RayHit LinearTrace(
         if (startBinarySearch && FastSign(stepSize) != sign)
         {
             stepSize = stepSize * sign * 0.5;
-            raymarchingThickness = raymarchingThickness * 0.5;
+            // raymarchingThickness = raymarchingThickness * saturate(1.2 * (hash.x + hash.y));
+
         }
         
         hitSuccessful = (depthDiff <= 0.0 && (depthDiff >= -raymarchingThickness) && !isSky) ? true:false;

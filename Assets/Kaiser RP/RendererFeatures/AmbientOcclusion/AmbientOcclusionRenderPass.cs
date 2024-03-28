@@ -56,7 +56,7 @@ public class AmbientOcclusionRenderPass : ScriptableRenderPass
 
             var camera = renderingData.cameraData.camera;
             var colorTextureIdentifier = renderingData.cameraData.renderer.cameraColorTargetHandle;
-            var descriptor = new RenderTextureDescriptor(camera.scaledPixelWidth, camera.scaledPixelHeight, RenderTextureFormat.ARGB64, 16)
+            var descriptor = new RenderTextureDescriptor(camera.scaledPixelWidth, camera.scaledPixelHeight, RenderTextureFormat.DefaultHDR, 16)
             {
                 enableRandomWrite = true
             };
